@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Base de datos principal
+  postgres:
+    image: postgres:15-alpine
+    container_name: michambita-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: michambita
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d michambita"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin - Interfaz web para PostgreSQL (opcional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: michambita-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@michambita.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# INSTRUCCIONES DE USO:
+#
+# 1. INICIAR POSTGRESQL:
+#    docker-compose up postgres -d
+#
+# 2. INICIAR TODO (PostgreSQL + PgAdmin):
+#    docker-compose up -d
+#
+# 3. DETENER SERVICIOS:
+#    docker-compose down
+#
+# 4. LIMPIAR DATOS:
+#    docker-compose down -v
+#
+# ACCESOS:
+# - PostgreSQL: localhost:5432
+# - PgAdmin: http://localhost:8080
+#   Usuario: admin@michambita.com
+#   Contrasena: admin123
+#
+# CONEXION EN PGADMIN:
+# Host: postgres
+# Port: 5432
+# Database: michambita
+# Username: postgres
+# Password: postgres
