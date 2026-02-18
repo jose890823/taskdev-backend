@@ -31,6 +31,12 @@ export class ProjectsController {
     return this.projectsService.findAll(user.id, organizationId, personal === 'true');
   }
 
+  @Get('by-slug/:slug')
+  @ApiOperation({ summary: 'Obtener proyecto por slug' })
+  async findBySlug(@Param('slug') slug: string) {
+    return this.projectsService.findBySlug(slug);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener proyecto por ID' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
