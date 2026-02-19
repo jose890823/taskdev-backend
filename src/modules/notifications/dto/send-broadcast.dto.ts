@@ -15,9 +15,7 @@ import { NotificationPriority } from '../entities/notification.entity';
  */
 export enum BroadcastAudience {
   ALL_USERS = 'all_users',
-  ALL_OWNERS = 'all_owners',
-  ALL_EMPLOYEES = 'all_employees',
-  BUSINESS_MEMBERS = 'business_members',
+  ORGANIZATION_MEMBERS = 'organization_members',
   SPECIFIC_USERS = 'specific_users',
 }
 

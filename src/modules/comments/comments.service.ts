@@ -2,11 +2,14 @@ import {
   Injectable, Logger, NotFoundException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Comment } from './entities/comment.entity';
 import { TaskCommentRead } from './entities/task-comment-read.entity';
 import { CreateCommentDto, UpdateCommentDto } from './dto';
 import { User } from '../auth/entities/user.entity';
+import { Task } from '../tasks/entities/task.entity';
+import { TaskAssignee } from '../tasks/entities/task-assignee.entity';
 
 @Injectable()
 export class CommentsService {
@@ -17,6 +20,8 @@ export class CommentsService {
     private readonly commentRepository: Repository<Comment>,
     @InjectRepository(TaskCommentRead)
     private readonly taskCommentReadRepository: Repository<TaskCommentRead>,
+    private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateCommentDto, user: User): Promise<any> {
@@ -30,6 +35,12 @@ export class CommentsService {
     await this.markAsRead(dto.taskId, user.id);
 
     this.logger.log(`Comentario creado por ${user.email} en tarea ${dto.taskId}`);
+
+    // Emit task.commented event
+    this.emitTaskCommented(dto.taskId, user).catch(err =>
+      this.logger.error(`Error emitting task.commented: ${err.message}`),
+    );
+
     return {
       ...comment,
       author: {
@@ -39,6 +50,30 @@ export class CommentsService {
         email: user.email,
       },
     };
+  }
+
+  private async emitTaskCommented(taskId: string, user: User): Promise<void> {
+    const task = await this.dataSource.getRepository(Task).findOne({ where: { id: taskId } });
+    if (!task) return;
+
+    const assignees = await this.dataSource.getRepository(TaskAssignee).find({ where: { taskId } });
+    const assigneeIds = assignees.map(a => a.userId);
+
+    // Also include task creator if not in assignees
+    if (task.createdById && !assigneeIds.includes(task.createdById)) {
+      assigneeIds.push(task.createdById);
+    }
+
+    if (assigneeIds.length > 0) {
+      this.eventEmitter.emit('task.commented', {
+        taskId,
+        taskTitle: task.title,
+        taskPriority: task.priority,
+        commentByName: `${user.firstName} ${user.lastName}`,
+        commentById: user.id,
+        assigneeIds,
+      });
+    }
   }
 
   async findByTask(taskId: string, currentUserId?: string): Promise<any[]> {

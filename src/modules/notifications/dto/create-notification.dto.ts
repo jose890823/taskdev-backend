@@ -27,7 +27,7 @@ export class CreateNotificationDto {
   userId: string;
 
   @ApiProperty({
-    example: 'enrollment_confirmed',
+    example: 'task_assigned',
     description: 'Tipo de notificación',
     enum: NotificationType,
   })
@@ -36,7 +36,7 @@ export class CreateNotificationDto {
   type: NotificationType;
 
   @ApiProperty({
-    example: 'Inscripción confirmada',
+    example: 'Tarea asignada',
     description: 'Título de la notificación',
   })
   @IsNotEmpty({ message: 'El título es obligatorio' })
@@ -45,7 +45,7 @@ export class CreateNotificationDto {
   title: string;
 
   @ApiProperty({
-    example: 'Tu inscripción al curso ha sido confirmada exitosamente.',
+    example: 'Juan te asigno la tarea "Disenar landing"',
     description: 'Mensaje de la notificación',
   })
   @IsNotEmpty({ message: 'El mensaje es obligatorio' })
@@ -71,7 +71,7 @@ export class CreateNotificationDto {
   priority?: NotificationPriority;
 
   @ApiPropertyOptional({
-    example: '/products/example-product',
+    example: '/tasks/550e8400-e29b-41d4-a716-446655440000',
     description: 'URL de acción',
   })
   @IsOptional()
@@ -80,7 +80,7 @@ export class CreateNotificationDto {
   actionUrl?: string;
 
   @ApiPropertyOptional({
-    example: 'Ver curso',
+    example: 'Ver tarea',
     description: 'Texto del botón de acción',
   })
   @IsOptional()
@@ -89,7 +89,7 @@ export class CreateNotificationDto {
   actionText?: string;
 
   @ApiPropertyOptional({
-    example: 'graduation-cap',
+    example: 'clipboard-check',
     description: 'Icono de la notificación',
   })
   @IsOptional()
@@ -106,7 +106,7 @@ export class CreateNotificationDto {
   referenceId?: string;
 
   @ApiPropertyOptional({
-    example: 'enrollment',
+    example: 'task',
     description: 'Tipo de entidad relacionada',
   })
   @IsOptional()

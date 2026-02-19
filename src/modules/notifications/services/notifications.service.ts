@@ -58,6 +58,10 @@ export class NotificationsService {
     let notification: Notification | null = null;
 
     if (shouldSend.inApp) {
+      // TTL de 30 días
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
       notification = this.notificationRepository.create({
         userId: dto.userId,
         type: dto.type,
@@ -74,6 +78,7 @@ export class NotificationsService {
         metadata: dto.metadata || null,
         sentAt: new Date(),
         deliveredAt: new Date(),
+        expiresAt,
       });
 
       notification = await this.notificationRepository.save(notification);
@@ -375,31 +380,20 @@ export class NotificationsService {
    */
   private getCategoryForType(type: NotificationType): string {
     const categoryMap: Record<string, string> = {
-      enrollment_created: 'enrollments',
-      enrollment_confirmed: 'enrollments',
-      enrollment_expired: 'enrollments',
-      enrollment_expiring_soon: 'enrollments',
-      payment_received: 'payments',
-      payment_failed: 'payments',
-      payment_reminder: 'payments',
-      refund_processed: 'payments',
-      evaluation_available: 'evaluations',
-      evaluation_graded: 'evaluations',
-      evaluation_deadline: 'evaluations',
-      certificate_issued: 'certificates',
-      certificate_expiring: 'certificates',
-      workshop_reminder: 'workshops',
-      workshop_registration: 'workshops',
-      workshop_cancelled: 'workshops',
-      workshop_certificate: 'workshops',
-      achievement_earned: 'progress',
-      course_completed: 'progress',
-      module_completed: 'progress',
+      task_assigned: 'tasks',
+      task_unassigned: 'tasks',
+      task_status_changed: 'tasks',
+      task_completed: 'tasks',
+      task_commented: 'tasks',
+      task_due_soon: 'tasks',
+      subtask_created: 'tasks',
+      project_member_added: 'projects',
+      project_member_removed: 'projects',
+      org_member_added: 'organizations',
+      org_invitation_received: 'organizations',
       system_announcement: 'announcements',
       account_security: 'announcements',
       password_changed: 'announcements',
-      referral_used: 'progress',
-      referral_reward: 'progress',
       welcome: 'announcements',
       custom: 'announcements',
     };
@@ -415,34 +409,23 @@ export class NotificationsService {
     category: string,
   ): boolean {
     const map: Record<string, boolean> = {
-      enrollments: prefs.inAppEnrollments,
-      payments: prefs.inAppPayments,
-      evaluations: prefs.inAppEvaluations,
-      certificates: prefs.inAppCertificates,
-      workshops: prefs.inAppWorkshops,
-      progress: prefs.inAppProgress,
+      tasks: prefs.inAppTasks,
+      projects: prefs.inAppProjects,
+      organizations: prefs.inAppOrganizations,
       announcements: prefs.inAppAnnouncements,
     };
     return map[category] ?? true;
   }
 
   /**
-   * Obtiene preferencia email para una categoría
+   * Obtiene preferencia email para una categoría (no implementado aun)
    */
   private getEmailPreference(
-    prefs: NotificationPreference,
-    category: string,
+    _prefs: NotificationPreference,
+    _category: string,
   ): boolean {
-    const map: Record<string, boolean> = {
-      enrollments: prefs.emailEnrollments,
-      payments: prefs.emailPayments,
-      evaluations: prefs.emailEvaluations,
-      certificates: prefs.emailCertificates,
-      workshops: prefs.emailWorkshops,
-      progress: prefs.emailProgress,
-      announcements: prefs.emailAnnouncements,
-    };
-    return map[category] ?? true;
+    // Solo in-app por ahora
+    return false;
   }
 
   /**
@@ -450,18 +433,17 @@ export class NotificationsService {
    */
   private getIconForType(type: NotificationType): string {
     const iconMap: Record<string, string> = {
-      enrollment_created: 'book-open',
-      enrollment_confirmed: 'check-circle',
-      enrollment_expired: 'clock',
-      payment_received: 'credit-card',
-      payment_failed: 'alert-circle',
-      evaluation_available: 'clipboard-list',
-      evaluation_graded: 'award',
-      certificate_issued: 'award',
-      workshop_reminder: 'calendar',
-      workshop_registration: 'users',
-      achievement_earned: 'trophy',
-      course_completed: 'graduation-cap',
+      task_assigned: 'user-plus',
+      task_unassigned: 'user-minus',
+      task_status_changed: 'arrow-right-left',
+      task_completed: 'check-circle',
+      task_commented: 'message-circle',
+      task_due_soon: 'clock',
+      subtask_created: 'list-plus',
+      project_member_added: 'folder-plus',
+      project_member_removed: 'folder-minus',
+      org_member_added: 'building',
+      org_invitation_received: 'mail',
       system_announcement: 'megaphone',
       welcome: 'hand-wave',
     };
@@ -507,20 +489,11 @@ export class NotificationsService {
         return dto.userIds || [];
 
       case BroadcastAudience.ALL_USERS:
-        // Esto se haría con una consulta a la BD
-        // Por ahora retornamos vacío, se implementará con el User repository
+        // TODO: implementar consulta a BD
         return [];
 
-      case BroadcastAudience.ALL_OWNERS:
-        // Todos los owners
-        return [];
-
-      case BroadcastAudience.ALL_EMPLOYEES:
-        // Todos los empleados
-        return [];
-
-      case BroadcastAudience.BUSINESS_MEMBERS:
-        // Miembros de un negocio específico
+      case BroadcastAudience.ORGANIZATION_MEMBERS:
+        // TODO: implementar consulta a BD con organizationId
         return [];
 
       default:

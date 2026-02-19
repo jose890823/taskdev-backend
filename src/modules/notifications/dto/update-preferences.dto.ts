@@ -48,84 +48,25 @@ export class UpdatePreferencesDto {
   smsEnabled?: boolean;
 
   // ============================================
-  // PREFERENCIAS POR CATEGORÍA - EMAIL
-  // ============================================
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailEnrollments?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailPayments?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailEvaluations?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailCertificates?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailWorkshops?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailProgress?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  emailAnnouncements?: boolean;
-
-  @ApiPropertyOptional({ example: false })
-  @IsOptional()
-  @IsBoolean()
-  emailMarketing?: boolean;
-
-  // ============================================
   // PREFERENCIAS POR CATEGORÍA - IN-APP
   // ============================================
 
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ example: true, description: 'Notificaciones de tareas' })
   @IsOptional()
   @IsBoolean()
-  inAppEnrollments?: boolean;
+  inAppTasks?: boolean;
 
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ example: true, description: 'Notificaciones de proyectos' })
   @IsOptional()
   @IsBoolean()
-  inAppPayments?: boolean;
+  inAppProjects?: boolean;
 
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ example: true, description: 'Notificaciones de organizaciones' })
   @IsOptional()
   @IsBoolean()
-  inAppEvaluations?: boolean;
+  inAppOrganizations?: boolean;
 
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  inAppCertificates?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  inAppWorkshops?: boolean;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  inAppProgress?: boolean;
-
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ example: true, description: 'Notificaciones de anuncios' })
   @IsOptional()
   @IsBoolean()
   inAppAnnouncements?: boolean;

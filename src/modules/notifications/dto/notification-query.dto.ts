@@ -18,7 +18,7 @@ import {
  */
 export class NotificationQueryDto {
   @ApiPropertyOptional({
-    example: 'enrollment_confirmed',
+    example: 'task_assigned',
     description: 'Filtrar por tipo',
     enum: NotificationType,
   })

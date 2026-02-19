@@ -17,12 +17,27 @@ import { User } from '../../auth/entities/user.entity';
  * Tipo de notificación
  */
 export enum NotificationType {
+  // Tareas
+  TASK_ASSIGNED = 'task_assigned',
+  TASK_UNASSIGNED = 'task_unassigned',
+  TASK_STATUS_CHANGED = 'task_status_changed',
+  TASK_COMPLETED = 'task_completed',
+  TASK_COMMENTED = 'task_commented',
+  TASK_DUE_SOON = 'task_due_soon',
+  SUBTASK_CREATED = 'subtask_created',
+
+  // Proyectos
+  PROJECT_MEMBER_ADDED = 'project_member_added',
+  PROJECT_MEMBER_REMOVED = 'project_member_removed',
+
+  // Organizaciones
+  ORG_MEMBER_ADDED = 'org_member_added',
+  ORG_INVITATION_RECEIVED = 'org_invitation_received',
+
   // Sistema
   SYSTEM_ANNOUNCEMENT = 'system_announcement',
   ACCOUNT_SECURITY = 'account_security',
   PASSWORD_CHANGED = 'password_changed',
-
-  // General
   WELCOME = 'welcome',
   CUSTOM = 'custom',
 }
@@ -106,11 +121,11 @@ export class Notification {
   // ============================================
 
   @ApiProperty({
-    example: 'enrollment_confirmed',
+    example: 'task_assigned',
     description: 'Tipo de notificación',
     enum: NotificationType,
   })
-  @Column({ type: 'enum', enum: NotificationType })
+  @Column({ type: 'varchar', length: 50 })
   type: NotificationType;
 
   @ApiProperty({
@@ -154,21 +169,21 @@ export class Notification {
   // ============================================
 
   @ApiProperty({
-    example: 'Inscripción confirmada',
+    example: 'Tarea asignada',
     description: 'Título de la notificación',
   })
   @Column({ type: 'varchar', length: 255 })
   title: string;
 
   @ApiProperty({
-    example: 'Tu orden del producto Premium Package ha sido confirmada.',
+    example: 'Juan te asigno la tarea "Disenar landing page"',
     description: 'Mensaje de la notificación',
   })
   @Column({ type: 'text' })
   message: string;
 
   @ApiProperty({
-    example: '/products/example-product',
+    example: '/tasks/550e8400-e29b-41d4-a716-446655440000',
     description: 'URL de acción (opcional)',
     required: false,
   })
@@ -176,7 +191,7 @@ export class Notification {
   actionUrl: string | null;
 
   @ApiProperty({
-    example: 'Ver curso',
+    example: 'Ver tarea',
     description: 'Texto del botón de acción',
     required: false,
   })
@@ -184,7 +199,7 @@ export class Notification {
   actionText: string | null;
 
   @ApiProperty({
-    example: 'graduation-cap',
+    example: 'clipboard-check',
     description: 'Icono de la notificación (nombre del icono)',
     required: false,
   })
@@ -251,14 +266,14 @@ export class Notification {
 
   @ApiProperty({
     example: '550e8400-e29b-41d4-a716-446655440000',
-    description: 'ID de la entidad relacionada (enrollment, certificate, etc.)',
+    description: 'ID de la entidad relacionada (task, project, etc.)',
     required: false,
   })
   @Column({ type: 'uuid', nullable: true })
   referenceId: string | null;
 
   @ApiProperty({
-    example: 'enrollment',
+    example: 'task',
     description: 'Tipo de entidad relacionada',
     required: false,
   })

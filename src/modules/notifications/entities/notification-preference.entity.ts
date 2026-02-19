@@ -68,110 +68,29 @@ export class NotificationPreference {
   smsEnabled: boolean;
 
   // ============================================
-  // PREFERENCIAS POR CATEGORÍA - EMAIL
-  // ============================================
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de inscripciones',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailEnrollments: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de pagos',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailPayments: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de evaluaciones',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailEvaluations: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de certificados',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailCertificates: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de workshops',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailWorkshops: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de progreso y logros',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailProgress: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de anuncios del sistema',
-  })
-  @Column({ type: 'boolean', default: true })
-  emailAnnouncements: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Emails de marketing y promociones',
-  })
-  @Column({ type: 'boolean', default: false })
-  emailMarketing: boolean;
-
-  // ============================================
   // PREFERENCIAS POR CATEGORÍA - IN-APP
   // ============================================
 
   @ApiProperty({
     example: true,
-    description: 'Notificaciones in-app de inscripciones',
+    description: 'Notificaciones in-app de tareas',
   })
   @Column({ type: 'boolean', default: true })
-  inAppEnrollments: boolean;
+  inAppTasks: boolean;
 
   @ApiProperty({
     example: true,
-    description: 'Notificaciones in-app de pagos',
+    description: 'Notificaciones in-app de proyectos',
   })
   @Column({ type: 'boolean', default: true })
-  inAppPayments: boolean;
+  inAppProjects: boolean;
 
   @ApiProperty({
     example: true,
-    description: 'Notificaciones in-app de evaluaciones',
+    description: 'Notificaciones in-app de organizaciones',
   })
   @Column({ type: 'boolean', default: true })
-  inAppEvaluations: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Notificaciones in-app de certificados',
-  })
-  @Column({ type: 'boolean', default: true })
-  inAppCertificates: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Notificaciones in-app de workshops',
-  })
-  @Column({ type: 'boolean', default: true })
-  inAppWorkshops: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Notificaciones in-app de progreso y logros',
-  })
-  @Column({ type: 'boolean', default: true })
-  inAppProgress: boolean;
+  inAppOrganizations: boolean;
 
   @ApiProperty({
     example: true,

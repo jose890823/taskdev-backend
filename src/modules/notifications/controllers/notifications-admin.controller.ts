@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -22,11 +23,14 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../auth/entities/user.entity';
 import { NotificationsService } from '../services/notifications.service';
+import { NotificationConfigService } from '../services/notification-config.service';
 import { Notification } from '../entities/notification.entity';
+import { NotificationEventConfig } from '../entities/notification-event-config.entity';
 import {
   CreateNotificationDto,
   NotificationQueryDto,
   SendBroadcastDto,
+  UpdateEventConfigDto,
 } from '../dto';
 
 @ApiTags('Admin - Notifications')
@@ -35,7 +39,10 @@ import {
 @Roles(UserRole.SUPER_ADMIN)
 @ApiBearerAuth()
 export class NotificationsAdminController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationConfigService: NotificationConfigService,
+  ) {}
 
   // ============================================
   // CREAR NOTIFICACIÓN
@@ -124,5 +131,41 @@ export class NotificationsAdminController {
   async cleanExpired(): Promise<{ deleted: number }> {
     const deleted = await this.notificationsService.cleanExpired();
     return { deleted };
+  }
+
+  // ============================================
+  // EVENT CONFIGS
+  // ============================================
+
+  @Get('event-configs')
+  @ApiOperation({
+    summary: 'Listar configuraciones de eventos',
+    description: 'Retorna todas las configuraciones de eventos de notificacion',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de configuraciones',
+    type: [NotificationEventConfig],
+  })
+  async getEventConfigs(): Promise<NotificationEventConfig[]> {
+    return this.notificationConfigService.findAll();
+  }
+
+  @Patch('event-configs/:id')
+  @ApiOperation({
+    summary: 'Actualizar configuracion de evento',
+    description: 'Habilita o deshabilita un tipo de evento de notificacion',
+  })
+  @ApiParam({ name: 'id', description: 'UUID de la configuracion' })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuracion actualizada',
+    type: NotificationEventConfig,
+  })
+  async updateEventConfig(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateEventConfigDto,
+  ): Promise<NotificationEventConfig> {
+    return this.notificationConfigService.update(id, dto);
   }
 }
