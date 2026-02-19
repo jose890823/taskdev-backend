@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, ParseUUIDPipe,
+  Controller, Get, Post, Patch, Delete, Body, Param,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
@@ -31,14 +31,14 @@ export class OrganizationsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener organizacion por ID' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('id') id: string) {
     return this.organizationsService.findById(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar organizacion' })
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateOrganizationDto,
     @CurrentUser() user: User,
   ) {
@@ -47,21 +47,21 @@ export class OrganizationsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar organizacion' })
-  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
     await this.organizationsService.remove(id, user.id);
     return { message: 'Organizacion eliminada' };
   }
 
   @Get(':id/members')
   @ApiOperation({ summary: 'Listar miembros de la organizacion' })
-  async getMembers(@Param('id', ParseUUIDPipe) id: string) {
+  async getMembers(@Param('id') id: string) {
     return this.organizationsService.getMembers(id);
   }
 
   @Post(':id/members')
   @ApiOperation({ summary: 'Agregar miembro a la organizacion' })
   async addMember(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: AddMemberDto,
     @CurrentUser() user: User,
   ) {
@@ -71,8 +71,8 @@ export class OrganizationsController {
   @Delete(':id/members/:userId')
   @ApiOperation({ summary: 'Eliminar miembro de la organizacion' })
   async removeMember(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
     @CurrentUser() user: User,
   ) {
     await this.organizationsService.removeMember(id, userId, user.id);

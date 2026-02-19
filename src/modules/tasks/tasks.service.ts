@@ -3,11 +3,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Task, TaskType } from './entities/task.entity';
 import { TaskAssignee } from './entities/task-assignee.entity';
 import { CreateTaskDto, UpdateTaskDto, BulkPositionItemDto } from './dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
 import { User } from '../auth/entities/user.entity';
+import { isUuid } from '../../common/utils/identifier.util';
 import { Comment } from '../comments/entities/comment.entity';
 import { TaskCommentRead } from '../comments/entities/task-comment-read.entity';
 
@@ -22,6 +24,7 @@ export class TasksService {
     private readonly taskAssigneeRepository: Repository<TaskAssignee>,
     private readonly taskStatusesService: TaskStatusesService,
     private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateTaskDto, user: User): Promise<Task> {
@@ -47,6 +50,20 @@ export class TasksService {
     // Save assignees in join table
     if (assignedToIds.length > 0) {
       await this.saveAssignees(task.id, assignedToIds);
+
+      // Emitir evento task.assigned para cada asignado (excepto el creador)
+      const assignerName = `${user.firstName} ${user.lastName}`;
+      for (const assigneeId of assignedToIds) {
+        if (assigneeId !== user.id) {
+          this.eventEmitter.emit('task.assigned', {
+            taskId: task.id,
+            taskTitle: task.title,
+            taskPriority: task.priority,
+            assignedToId: assigneeId,
+            assignedByName: assignerName,
+          });
+        }
+      }
     }
 
     this.logger.log(`Tarea creada: ${task.title} por ${user.email}`);
@@ -243,15 +260,16 @@ export class TasksService {
       .getMany();
   }
 
-  async findById(id: string): Promise<Task> {
-    const task = await this.taskRepository.findOne({ where: { id } });
+  async findById(identifier: string): Promise<Task> {
+    const where = isUuid(identifier) ? { id: identifier } : { systemCode: identifier };
+    const task = await this.taskRepository.findOne({ where });
     if (!task) throw new NotFoundException('Tarea no encontrada');
     return task;
   }
 
-  async findByIdWithAssignees(id: string): Promise<any> {
-    const task = await this.findById(id);
-    let assignees = await this.getTaskAssignees(id);
+  async findByIdWithAssignees(identifier: string): Promise<any> {
+    const task = await this.findById(identifier);
+    let assignees = await this.getTaskAssignees(task.id);
 
     // Fallback: if no assignees in join table but legacy field exists, hydrate from it
     if (assignees.length === 0 && task.assignedToId) {
@@ -269,8 +287,11 @@ export class TasksService {
     return { ...task, assignees };
   }
 
-  async update(id: string, dto: UpdateTaskDto): Promise<any> {
-    const task = await this.findById(id);
+  async update(identifier: string, dto: UpdateTaskDto, currentUser?: User): Promise<any> {
+    const task = await this.findById(identifier);
+    const id = task.id;
+    const originalTitle = task.title;
+    const oldStatusId = task.statusId;
 
     if (dto.statusId && dto.statusId !== task.statusId) {
       const newStatus = await this.taskStatusesService.findById(dto.statusId);
@@ -282,6 +303,10 @@ export class TasksService {
     }
 
     // Handle assignedToIds
+    const oldAssigneeIds = dto.assignedToIds !== undefined
+      ? (await this.getTaskAssignees(id)).map(a => a.id)
+      : [];
+
     if (dto.assignedToIds !== undefined) {
       // Validate subtask restriction
       if (task.parentId) {
@@ -298,17 +323,88 @@ export class TasksService {
     const savedTask = await this.taskRepository.save(task);
 
     const assignees = await this.getTaskAssignees(id);
+
+    // Emit notification events
+    const taskTitle = savedTask.title || originalTitle;
+    if (currentUser) {
+      const actorName = `${currentUser.firstName} ${currentUser.lastName}`;
+
+      // Emit task.assigned / task.unassigned for assignee changes
+      if (dto.assignedToIds !== undefined) {
+        const oldSet = new Set(oldAssigneeIds);
+        const newSet = new Set(dto.assignedToIds);
+
+        // New assignees
+        for (const uid of dto.assignedToIds) {
+          if (!oldSet.has(uid) && uid !== currentUser.id) {
+            this.eventEmitter.emit('task.assigned', {
+              taskId: id,
+              taskTitle,
+              taskPriority: savedTask.priority || task.priority,
+              assignedToId: uid,
+              assignedByName: actorName,
+            });
+          }
+        }
+
+        // Removed assignees
+        for (const uid of oldAssigneeIds) {
+          if (!newSet.has(uid) && uid !== currentUser.id) {
+            this.eventEmitter.emit('task.unassigned', {
+              taskId: id,
+              taskTitle,
+              taskPriority: savedTask.priority || task.priority,
+              unassignedUserId: uid,
+              unassignedByName: actorName,
+            });
+          }
+        }
+      }
+
+      // Emit task.status_changed / task.completed
+      if (dto.statusId && dto.statusId !== oldStatusId) {
+        const assigneeIds = assignees.map(a => a.id);
+        const [oldStatus, newStatus] = await Promise.all([
+          oldStatusId ? this.taskStatusesService.findById(oldStatusId).catch(() => null) : null,
+          this.taskStatusesService.findById(dto.statusId),
+        ]);
+
+        this.eventEmitter.emit('task.status_changed', {
+          taskId: id,
+          taskTitle,
+          taskPriority: savedTask.priority || task.priority,
+          oldStatusName: oldStatus?.name || 'Sin estado',
+          newStatusName: newStatus.name,
+          changedByName: actorName,
+          assigneeIds,
+          changedById: currentUser.id,
+        });
+
+        if (newStatus.isCompleted) {
+          this.eventEmitter.emit('task.completed', {
+            taskId: id,
+            taskTitle,
+            taskPriority: savedTask.priority || task.priority,
+            completedByName: actorName,
+            assigneeIds,
+            completedById: currentUser.id,
+          });
+        }
+      }
+    }
+
     return { ...savedTask, assignees };
   }
 
-  async remove(id: string): Promise<void> {
-    await this.findById(id);
-    await this.taskRepository.softDelete(id);
+  async remove(identifier: string): Promise<void> {
+    const task = await this.findById(identifier);
+    await this.taskRepository.softDelete(task.id);
   }
 
-  async getSubtasks(parentId: string): Promise<any[]> {
+  async getSubtasks(identifier: string): Promise<any[]> {
+    const parent = await this.findById(identifier);
     const subtasks = await this.taskRepository.find({
-      where: { parentId },
+      where: { parentId: parent.id },
       order: { position: 'ASC' },
     });
 
@@ -340,8 +436,9 @@ export class TasksService {
     }));
   }
 
-  async createSubtask(parentId: string, dto: CreateTaskDto, user: User): Promise<Task> {
-    const parent = await this.findById(parentId);
+  async createSubtask(identifier: string, dto: CreateTaskDto, user: User): Promise<Task> {
+    const parent = await this.findById(identifier);
+    const parentId = parent.id;
 
     // Validate subtask assignees
     const assignedToIds = dto.assignedToIds || (dto.assignedToId ? [dto.assignedToId] : []);
@@ -349,12 +446,28 @@ export class TasksService {
       await this.validateSubtaskAssignees(parentId, assignedToIds);
     }
 
-    return this.create({
+    const subtask = await this.create({
       ...dto,
       parentId,
       projectId: dto.projectId ?? parent.projectId ?? undefined,
       organizationId: dto.organizationId ?? parent.organizationId ?? undefined,
     }, user);
+
+    // Emit subtask.created to parent task assignees
+    const parentAssignees = await this.getTaskAssignees(parentId);
+    if (parentAssignees.length > 0) {
+      this.eventEmitter.emit('subtask.created', {
+        parentTaskId: parentId,
+        parentTaskTitle: parent.title,
+        subtaskTitle: subtask.title,
+        taskPriority: subtask.priority,
+        createdByName: `${user.firstName} ${user.lastName}`,
+        createdById: user.id,
+        assigneeIds: parentAssignees.map(a => a.id),
+      });
+    }
+
+    return subtask;
   }
 
   async bulkUpdatePositions(items: BulkPositionItemDto[]): Promise<{ updated: number }> {

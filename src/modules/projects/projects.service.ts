@@ -2,12 +2,13 @@ import {
   Injectable, Logger, NotFoundException, ConflictException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Project } from './entities/project.entity';
 import { ProjectMember, ProjectRole } from './entities/project-member.entity';
 import { CreateProjectDto, UpdateProjectDto, AddProjectMemberDto } from './dto';
 import { User } from '../auth/entities/user.entity';
+import { isUuid } from '../../common/utils/identifier.util';
 
 @Injectable()
 export class ProjectsService {
@@ -19,6 +20,7 @@ export class ProjectsService {
     @InjectRepository(ProjectMember)
     private readonly memberRepository: Repository<ProjectMember>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateProjectDto, user: User): Promise<Project> {
@@ -62,8 +64,9 @@ export class ProjectsService {
     return qb.orderBy('p.createdAt', 'DESC').getMany();
   }
 
-  async findById(id: string): Promise<Project> {
-    const project = await this.projectRepository.findOne({ where: { id } });
+  async findById(identifier: string): Promise<Project> {
+    const where = isUuid(identifier) ? { id: identifier } : { systemCode: identifier };
+    const project = await this.projectRepository.findOne({ where });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     return project;
   }
@@ -74,9 +77,9 @@ export class ProjectsService {
     return project;
   }
 
-  async update(id: string, dto: UpdateProjectDto, userId: string): Promise<Project> {
-    const project = await this.findById(id);
-    await this.verifyAdminAccess(id, userId);
+  async update(identifier: string, dto: UpdateProjectDto, userId: string): Promise<Project> {
+    const project = await this.findById(identifier);
+    await this.verifyAdminAccess(project.id, userId);
 
     if (dto.name && dto.name !== project.name) {
       project.slug = this.generateSlug(dto.name);
@@ -86,46 +89,72 @@ export class ProjectsService {
     return this.projectRepository.save(project);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
-    const project = await this.findById(id);
+  async remove(identifier: string, userId: string): Promise<void> {
+    const project = await this.findById(identifier);
     if (project.ownerId !== userId) {
       throw new ForbiddenException('Solo el dueno puede eliminar el proyecto');
     }
-    await this.projectRepository.softDelete(id);
+    await this.projectRepository.softDelete(project.id);
   }
 
-  async getMembers(projectId: string): Promise<ProjectMember[]> {
-    await this.findById(projectId);
+  async getMembers(identifier: string): Promise<ProjectMember[]> {
+    const project = await this.findById(identifier);
     return this.memberRepository.find({
-      where: { projectId },
+      where: { projectId: project.id },
       relations: ['user'],
       order: { createdAt: 'ASC' },
     });
   }
 
-  async addMember(projectId: string, dto: AddProjectMemberDto, requestUserId: string): Promise<ProjectMember> {
-    await this.findById(projectId);
-    await this.verifyAdminAccess(projectId, requestUserId);
+  async addMember(identifier: string, dto: AddProjectMemberDto, requestUserId: string): Promise<ProjectMember> {
+    const project = await this.findById(identifier);
+    await this.verifyAdminAccess(project.id, requestUserId);
 
     const existing = await this.memberRepository.findOne({
-      where: { projectId, userId: dto.userId },
+      where: { projectId: project.id, userId: dto.userId },
     });
     if (existing) throw new ConflictException('El usuario ya es miembro del proyecto');
 
-    const member = this.memberRepository.create({ projectId, ...dto });
-    return this.memberRepository.save(member);
+    const member = this.memberRepository.create({ projectId: project.id, ...dto });
+    const saved = await this.memberRepository.save(member);
+
+    // Emit project.member_added
+    if (dto.userId !== requestUserId) {
+      const requestUser = await this.getMinimalUser(requestUserId);
+      this.eventEmitter.emit('project.member_added', {
+        projectId: project.id,
+        projectSlug: project.slug,
+        projectName: project.name,
+        addedUserId: dto.userId,
+        addedByName: requestUser ? `${requestUser.firstName} ${requestUser.lastName}` : 'Un administrador',
+      });
+    }
+
+    return saved;
   }
 
-  async removeMember(projectId: string, userId: string, requestUserId: string): Promise<void> {
-    await this.verifyAdminAccess(projectId, requestUserId);
+  async removeMember(identifier: string, userId: string, requestUserId: string): Promise<void> {
+    const project = await this.findById(identifier);
+    await this.verifyAdminAccess(project.id, requestUserId);
     const member = await this.memberRepository.findOne({
-      where: { projectId, userId },
+      where: { projectId: project.id, userId },
     });
     if (!member) throw new NotFoundException('Miembro no encontrado');
     if (member.role === ProjectRole.OWNER) {
       throw new ForbiddenException('No se puede eliminar al dueno del proyecto');
     }
     await this.memberRepository.remove(member);
+
+    // Emit project.member_removed
+    if (userId !== requestUserId) {
+      const requestUser = await this.getMinimalUser(requestUserId);
+      this.eventEmitter.emit('project.member_removed', {
+        projectId: project.id,
+        projectName: project.name,
+        removedUserId: userId,
+        removedByName: requestUser ? `${requestUser.firstName} ${requestUser.lastName}` : 'Un administrador',
+      });
+    }
   }
 
   async hasAdminAccess(projectId: string, userId: string): Promise<boolean> {
@@ -142,7 +171,26 @@ export class ProjectsService {
     if (existing) throw new ConflictException('El usuario ya es miembro del proyecto');
 
     const member = this.memberRepository.create({ projectId, userId, role });
-    return this.memberRepository.save(member);
+    const saved = await this.memberRepository.save(member);
+
+    // Emit project.member_added
+    const project = await this.findById(projectId);
+    this.eventEmitter.emit('project.member_added', {
+      projectId,
+      projectSlug: project.slug,
+      projectName: project.name,
+      addedUserId: userId,
+      addedByName: 'El sistema',
+    });
+
+    return saved;
+  }
+
+  private async getMinimalUser(userId: string): Promise<{ firstName: string; lastName: string } | null> {
+    return this.dataSource.getRepository(User).findOne({
+      where: { id: userId },
+      select: ['id', 'firstName', 'lastName'],
+    });
   }
 
   private async verifyAdminAccess(projectId: string, userId: string): Promise<void> {

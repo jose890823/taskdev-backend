@@ -7,6 +7,7 @@ import { Organization } from './entities/organization.entity';
 import { OrganizationMember, OrganizationRole } from './entities/organization-member.entity';
 import { CreateOrganizationDto, UpdateOrganizationDto, AddMemberDto } from './dto';
 import { User } from '../auth/entities/user.entity';
+import { isUuid } from '../../common/utils/identifier.util';
 
 @Injectable()
 export class OrganizationsService {
@@ -62,20 +63,21 @@ export class OrganizationsService {
     return this.orgRepository.find({ order: { createdAt: 'DESC' } });
   }
 
-  async findById(id: string): Promise<Organization> {
-    const org = await this.orgRepository.findOne({ where: { id } });
+  async findById(identifier: string): Promise<Organization> {
+    const where = isUuid(identifier) ? { id: identifier } : { systemCode: identifier };
+    const org = await this.orgRepository.findOne({ where });
     if (!org) throw new NotFoundException('Organizacion no encontrada');
     return org;
   }
 
-  async update(id: string, dto: UpdateOrganizationDto, userId: string): Promise<Organization> {
-    const org = await this.findById(id);
-    await this.verifyAdminAccess(id, userId);
+  async update(identifier: string, dto: UpdateOrganizationDto, userId: string): Promise<Organization> {
+    const org = await this.findById(identifier);
+    await this.verifyAdminAccess(org.id, userId);
 
     if (dto.name && dto.name !== org.name) {
       const slug = this.generateSlug(dto.name);
       const existing = await this.orgRepository.findOne({ where: { slug } });
-      if (existing && existing.id !== id) {
+      if (existing && existing.id !== org.id) {
         throw new ConflictException('Ya existe una organizacion con ese nombre');
       }
       (org as any).slug = slug;
@@ -85,18 +87,18 @@ export class OrganizationsService {
     return this.orgRepository.save(org);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
-    const org = await this.findById(id);
+  async remove(identifier: string, userId: string): Promise<void> {
+    const org = await this.findById(identifier);
     if (org.ownerId !== userId) {
       throw new ForbiddenException('Solo el dueno puede eliminar la organizacion');
     }
-    await this.orgRepository.softDelete(id);
+    await this.orgRepository.softDelete(org.id);
   }
 
-  async getMembers(organizationId: string): Promise<OrganizationMember[]> {
-    await this.findById(organizationId);
+  async getMembers(identifier: string): Promise<OrganizationMember[]> {
+    const org = await this.findById(identifier);
     return this.memberRepository.find({
-      where: { organizationId },
+      where: { organizationId: org.id },
       relations: ['user'],
       order: { createdAt: 'ASC' },
     });
@@ -109,27 +111,28 @@ export class OrganizationsService {
     return member?.role || null;
   }
 
-  async addMember(organizationId: string, dto: AddMemberDto, requestUserId: string): Promise<OrganizationMember> {
-    await this.findById(organizationId);
-    await this.verifyAdminAccess(organizationId, requestUserId);
+  async addMember(identifier: string, dto: AddMemberDto, requestUserId: string): Promise<OrganizationMember> {
+    const org = await this.findById(identifier);
+    await this.verifyAdminAccess(org.id, requestUserId);
 
     const existing = await this.memberRepository.findOne({
-      where: { organizationId, userId: dto.userId },
+      where: { organizationId: org.id, userId: dto.userId },
     });
     if (existing) throw new ConflictException('El usuario ya es miembro');
 
     const member = this.memberRepository.create({
-      organizationId,
+      organizationId: org.id,
       userId: dto.userId,
       role: dto.role,
     });
     return this.memberRepository.save(member);
   }
 
-  async removeMember(organizationId: string, userId: string, requestUserId: string): Promise<void> {
-    await this.verifyAdminAccess(organizationId, requestUserId);
+  async removeMember(identifier: string, userId: string, requestUserId: string): Promise<void> {
+    const org = await this.findById(identifier);
+    await this.verifyAdminAccess(org.id, requestUserId);
     const member = await this.memberRepository.findOne({
-      where: { organizationId, userId },
+      where: { organizationId: org.id, userId },
     });
     if (!member) throw new NotFoundException('Miembro no encontrado');
     if (member.role === OrganizationRole.OWNER) {

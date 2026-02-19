@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseUUIDPipe,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
@@ -68,33 +68,33 @@ export class TasksController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener tarea por ID con asignados' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('id') id: string) {
     return this.tasksService.findByIdWithAssignees(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar tarea' })
-  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTaskDto) {
-    return this.tasksService.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentUser() user: User) {
+    return this.tasksService.update(id, dto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar tarea' })
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
+  async remove(@Param('id') id: string) {
     await this.tasksService.remove(id);
     return { message: 'Tarea eliminada' };
   }
 
   @Get(':id/subtasks')
   @ApiOperation({ summary: 'Obtener subtareas' })
-  async getSubtasks(@Param('id', ParseUUIDPipe) id: string) {
+  async getSubtasks(@Param('id') id: string) {
     return this.tasksService.getSubtasks(id);
   }
 
   @Post(':id/subtasks')
   @ApiOperation({ summary: 'Crear subtarea' })
   async createSubtask(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: CreateTaskDto,
     @CurrentUser() user: User,
   ) {

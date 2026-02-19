@@ -1,6 +1,7 @@
 import { Module, Logger, Global } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ModuleLoaderService } from './shared/module-loader.service';
@@ -33,6 +34,7 @@ import { TaskStatusesModule } from './modules/task-statuses/task-statuses.module
 import { TasksModule } from './modules/tasks/tasks.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { ActivityModule } from './modules/activity/activity.module';
+import { SearchModule } from './modules/search/search.module';
 
 // Importacion condicional de modulos opcionales
 let EmailModule: any = null;
@@ -52,6 +54,7 @@ if (
 @Module({
   imports: [
     DatabaseModule,
+    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({
       wildcard: false,
       delimiter: '.',
@@ -82,6 +85,7 @@ if (
     TasksModule,
     CommentsModule,
     ActivityModule,
+    SearchModule,
     // Modulos opcionales
     ...(EmailModule ? [EmailModule] : []),
   ],

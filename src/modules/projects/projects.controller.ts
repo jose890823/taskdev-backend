@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseUUIDPipe,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
@@ -39,14 +39,14 @@ export class ProjectsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener proyecto por ID' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('id') id: string) {
     return this.projectsService.findById(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar proyecto' })
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
     @CurrentUser() user: User,
   ) {
@@ -55,21 +55,21 @@ export class ProjectsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar proyecto' })
-  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
     await this.projectsService.remove(id, user.id);
     return { message: 'Proyecto eliminado' };
   }
 
   @Get(':id/members')
   @ApiOperation({ summary: 'Listar miembros del proyecto' })
-  async getMembers(@Param('id', ParseUUIDPipe) id: string) {
+  async getMembers(@Param('id') id: string) {
     return this.projectsService.getMembers(id);
   }
 
   @Post(':id/members')
   @ApiOperation({ summary: 'Agregar miembro al proyecto' })
   async addMember(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: AddProjectMemberDto,
     @CurrentUser() user: User,
   ) {
@@ -79,8 +79,8 @@ export class ProjectsController {
   @Delete(':id/members/:userId')
   @ApiOperation({ summary: 'Eliminar miembro del proyecto' })
   async removeMember(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
     @CurrentUser() user: User,
   ) {
     await this.projectsService.removeMember(id, userId, user.id);
