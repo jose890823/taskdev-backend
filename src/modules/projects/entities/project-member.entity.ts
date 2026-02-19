@@ -1,7 +1,9 @@
 import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../auth/entities/user.entity';
 
 export enum ProjectRole {
   OWNER = 'owner',
@@ -21,6 +23,10 @@ export class ProjectMember {
 
   @Column({ type: 'uuid' })
   userId: string;
+
+  @ManyToOne(() => User, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user?: User;
 
   @ApiProperty({ enum: ProjectRole })
   @Column({ type: 'enum', enum: ProjectRole, default: ProjectRole.MEMBER })

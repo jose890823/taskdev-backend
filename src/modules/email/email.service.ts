@@ -8,11 +8,13 @@ import {
   SendOtpEmailDto,
   SendWelcomeEmailDto,
   SendPasswordResetEmailDto,
+  SendInvitationEmailDto,
   EmailResult,
 } from './interfaces/email.interface';
 import { getOtpEmailTemplate } from './templates/otp.template';
 import { getWelcomeEmailTemplate } from './templates/welcome.template';
 import { getPasswordResetTemplate } from './templates/password-reset.template';
+import { getInvitationEmailTemplate } from './templates/invitation.template';
 
 type EmailProvider = 'resend' | 'gmail' | 'none';
 
@@ -225,6 +227,35 @@ export class EmailService {
     return this.sendEmail({
       to: dto.to,
       subject: `Restablecer contraseña - ${this.brandName}`,
+      html,
+    });
+  }
+
+  /**
+   * Envía email de invitacion a organizacion
+   */
+  async sendInvitationEmail(dto: SendInvitationEmailDto): Promise<EmailResult> {
+    if (this.provider === 'none') {
+      this.logger.log(`📧 [SIMULADO] Invitacion para ${dto.to}: ${dto.inviteUrl}`);
+      return { success: true, messageId: 'simulated' };
+    }
+
+    const html = getInvitationEmailTemplate({
+      organizationName: dto.organizationName,
+      inviteUrl: dto.inviteUrl,
+      invitedByName: dto.invitedByName,
+      role: dto.role,
+      brandName: this.brandName,
+      projectName: dto.projectName,
+    });
+
+    const subject = dto.projectName
+      ? `Te han invitado al proyecto ${dto.projectName} - ${this.brandName}`
+      : `Te han invitado a ${dto.organizationName} - ${this.brandName}`;
+
+    return this.sendEmail({
+      to: dto.to,
+      subject,
       html,
     });
   }

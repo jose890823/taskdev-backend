@@ -1,7 +1,8 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index,
+  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../auth/entities/user.entity';
 
 export enum OrganizationRole {
   OWNER = 'owner',
@@ -20,6 +21,10 @@ export class OrganizationMember {
 
   @Column({ type: 'uuid' })
   userId: string;
+
+  @ManyToOne(() => User, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user?: User;
 
   @ApiProperty({ enum: OrganizationRole, description: 'Rol en la organizacion' })
   @Column({ type: 'enum', enum: OrganizationRole, default: OrganizationRole.MEMBER })

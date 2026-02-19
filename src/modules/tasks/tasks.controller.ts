@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
-import { CreateTaskDto, UpdateTaskDto } from './dto';
+import { CreateTaskDto, UpdateTaskDto, BulkUpdatePositionsDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { TaskType } from './entities/task.entity';
@@ -30,6 +30,7 @@ export class TasksController {
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async findAll(
+    @CurrentUser() user: User,
     @Query('projectId') projectId?: string,
     @Query('organizationId') organizationId?: string,
     @Query('statusId') statusId?: string,
@@ -42,7 +43,7 @@ export class TasksController {
       projectId, organizationId, statusId, assignedToId, type,
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,
-    });
+    }, user.id);
   }
 
   @Get('my')
@@ -59,10 +60,16 @@ export class TasksController {
     return this.tasksService.findDailyTasks(user.id, date);
   }
 
+  @Patch('bulk-positions')
+  @ApiOperation({ summary: 'Actualizar posiciones y estados en bulk (drag & drop)' })
+  async bulkUpdatePositions(@Body() dto: BulkUpdatePositionsDto) {
+    return this.tasksService.bulkUpdatePositions(dto.items);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener tarea por ID' })
+  @ApiOperation({ summary: 'Obtener tarea por ID con asignados' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.tasksService.findById(id);
+    return this.tasksService.findByIdWithAssignees(id);
   }
 
   @Patch(':id')

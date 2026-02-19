@@ -98,6 +98,7 @@ export class ProjectsService {
     await this.findById(projectId);
     return this.memberRepository.find({
       where: { projectId },
+      relations: ['user'],
       order: { createdAt: 'ASC' },
     });
   }
@@ -127,11 +128,26 @@ export class ProjectsService {
     await this.memberRepository.remove(member);
   }
 
-  private async verifyAdminAccess(projectId: string, userId: string): Promise<void> {
+  async hasAdminAccess(projectId: string, userId: string): Promise<boolean> {
     const member = await this.memberRepository.findOne({
       where: { projectId, userId },
     });
-    if (!member || (member.role !== ProjectRole.OWNER && member.role !== ProjectRole.ADMIN)) {
+    return !!member && (member.role === ProjectRole.OWNER || member.role === ProjectRole.ADMIN);
+  }
+
+  async addMemberByUserId(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
+    const existing = await this.memberRepository.findOne({
+      where: { projectId, userId },
+    });
+    if (existing) throw new ConflictException('El usuario ya es miembro del proyecto');
+
+    const member = this.memberRepository.create({ projectId, userId, role });
+    return this.memberRepository.save(member);
+  }
+
+  private async verifyAdminAccess(projectId: string, userId: string): Promise<void> {
+    const hasAccess = await this.hasAdminAccess(projectId, userId);
+    if (!hasAccess) {
       throw new ForbiddenException('No tienes permisos de administrador en este proyecto');
     }
   }

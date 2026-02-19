@@ -40,6 +40,18 @@ export interface SendPasswordResetEmailDto {
 }
 
 /**
+ * DTO para email de invitacion a organizacion
+ */
+export interface SendInvitationEmailDto {
+  to: string;
+  organizationName: string;
+  inviteUrl: string;
+  invitedByName?: string;
+  role: string;
+  projectName?: string;
+}
+
+/**
  * Resultado del envío de email
  */
 export interface EmailResult {

@@ -97,8 +97,16 @@ export class OrganizationsService {
     await this.findById(organizationId);
     return this.memberRepository.find({
       where: { organizationId },
+      relations: ['user'],
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async getMemberRole(organizationId: string, userId: string): Promise<string | null> {
+    const member = await this.memberRepository.findOne({
+      where: { organizationId, userId },
+    });
+    return member?.role || null;
   }
 
   async addMember(organizationId: string, dto: AddMemberDto, requestUserId: string): Promise<OrganizationMember> {

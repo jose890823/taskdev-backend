@@ -12,7 +12,7 @@ export enum InvitationStatus {
 
 @Entity('invitations')
 @Index(['token'], { unique: true })
-@Index(['organizationId', 'email'])
+@Index(['organizationId', 'email', 'projectId'])
 export class Invitation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,6 +37,14 @@ export class Invitation {
   @ApiProperty({ enum: InvitationStatus })
   @Column({ type: 'enum', enum: InvitationStatus, default: InvitationStatus.PENDING })
   status: InvitationStatus;
+
+  @ApiProperty({ example: null, description: 'ID del proyecto (si es invitacion a proyecto)', nullable: true })
+  @Column({ type: 'uuid', nullable: true })
+  projectId: string | null;
+
+  @ApiProperty({ example: null, description: 'Rol en el proyecto', nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  projectRole: string | null;
 
   @Column({ type: 'timestamp' })
   expiresAt: Date;

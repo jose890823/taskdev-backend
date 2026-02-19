@@ -21,8 +21,11 @@ export class CommentsController {
 
   @Get('task/:taskId')
   @ApiOperation({ summary: 'Listar comentarios de una tarea' })
-  async findByTask(@Param('taskId', ParseUUIDPipe) taskId: string) {
-    return this.commentsService.findByTask(taskId);
+  async findByTask(
+    @Param('taskId', ParseUUIDPipe) taskId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.commentsService.findByTask(taskId, user.id);
   }
 
   @Patch(':id')

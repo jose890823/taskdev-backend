@@ -1,8 +1,9 @@
 import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index,
+  DeleteDateColumn, Index, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../auth/entities/user.entity';
 
 @Entity('comments')
 @Index(['taskId'])
@@ -16,6 +17,10 @@ export class Comment {
 
   @Column({ type: 'uuid' })
   userId: string;
+
+  @ManyToOne(() => User, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user?: User;
 
   @ApiProperty({ example: 'Este es un comentario' })
   @Column({ type: 'text' })
