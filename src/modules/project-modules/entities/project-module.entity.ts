@@ -1,12 +1,13 @@
 import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index, BeforeInsert,
+  DeleteDateColumn, Index, BeforeInsert, ManyToOne, OneToMany, JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
 
 @Entity('project_modules')
 @Index(['projectId'])
+@Index(['parentId'])
 export class ProjectModule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -23,6 +24,17 @@ export class ProjectModule {
 
   @Column({ type: 'uuid' })
   projectId: string;
+
+  @ApiProperty({ example: null, required: false, description: 'ID del modulo padre (null = raiz)' })
+  @Column({ type: 'uuid', nullable: true })
+  parentId: string | null;
+
+  @ManyToOne(() => ProjectModule, (m) => m.children, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parentId' })
+  parent: ProjectModule | null;
+
+  @OneToMany(() => ProjectModule, (m) => m.parent)
+  children: ProjectModule[];
 
   @ApiProperty({ example: 'Frontend' })
   @Column({ type: 'varchar', length: 255 })

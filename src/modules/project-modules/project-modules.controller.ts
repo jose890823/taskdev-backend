@@ -1,7 +1,7 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, ParseUUIDPipe,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProjectModulesService } from './project-modules.service';
 import { CreateProjectModuleDto, UpdateProjectModuleDto, ReorderModulesDto } from './dto';
 
@@ -21,8 +21,15 @@ export class ProjectModulesController {
   }
 
   @Get('projects/:projectId/modules')
-  @ApiOperation({ summary: 'Listar modulos del proyecto' })
-  async findByProject(@Param('projectId', ParseUUIDPipe) projectId: string) {
+  @ApiOperation({ summary: 'Listar modulos del proyecto (arbol o lista plana)' })
+  @ApiQuery({ name: 'flat', required: false, type: Boolean, description: 'Si true, devuelve lista plana en vez de arbol' })
+  async findByProject(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query('flat') flat?: string,
+  ) {
+    if (flat === 'true') {
+      return this.projectModulesService.findAllFlat(projectId);
+    }
     return this.projectModulesService.findByProject(projectId);
   }
 
@@ -36,7 +43,7 @@ export class ProjectModulesController {
   }
 
   @Delete('project-modules/:id')
-  @ApiOperation({ summary: 'Eliminar modulo' })
+  @ApiOperation({ summary: 'Eliminar modulo (y sus submodulos)' })
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     await this.projectModulesService.remove(id);
     return { message: 'Modulo eliminado' };

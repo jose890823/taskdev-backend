@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateProjectModuleDto {
   @ApiProperty({ example: 'Frontend', description: 'Nombre del modulo' })
@@ -17,4 +17,9 @@ export class CreateProjectModuleDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @ApiProperty({ example: null, required: false, description: 'ID del modulo padre (para crear submodulo)' })
+  @IsOptional()
+  @IsUUID('4', { message: 'El parentId debe ser un UUID valido' })
+  parentId?: string;
 }
