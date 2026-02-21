@@ -5,7 +5,7 @@ interface WelcomeTemplateData {
 }
 
 export function getWelcomeEmailTemplate(data: WelcomeTemplateData): string {
-  const brandName = data.brandName || 'MiChambita';
+  const brandName = data.brandName || 'TaskHub';
   const fullName = data.lastName
     ? `${data.firstName} ${data.lastName}`
     : data.firstName;
@@ -16,56 +16,81 @@ export function getWelcomeEmailTemplate(data: WelcomeTemplateData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bienvenido</title>
+  <title>Bienvenido a ${brandName}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Arial', sans-serif; background-color: #f4f4f4;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0f172a;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0f172a; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table width="520" cellpadding="0" cellspacing="0" border="0" style="background-color: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155;">
 
+          <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 600;">
-                ¡Bienvenido!
+            <td style="padding: 40px 40px 20px; text-align: center;">
+              <div style="display: inline-block; background-color: #3b82f6; width: 48px; height: 48px; border-radius: 12px; line-height: 48px; text-align: center; font-size: 22px; font-weight: 700; color: #ffffff; margin-bottom: 16px;">
+                T
+              </div>
+              <h1 style="margin: 16px 0 0; color: #f1f5f9; font-size: 24px; font-weight: 600; letter-spacing: -0.02em;">
+                Bienvenido a ${brandName}
               </h1>
             </td>
           </tr>
 
+          <!-- Content -->
           <tr>
-            <td style="padding: 40px 30px;">
-              <p style="margin: 0 0 20px; color: #333333; font-size: 18px; line-height: 1.5;">
-                Hola <strong>${fullName}</strong>,
+            <td style="padding: 16px 40px 40px;">
+              <p style="margin: 0 0 20px; color: #94a3b8; font-size: 15px; line-height: 1.6;">
+                Hola <span style="color: #e2e8f0; font-weight: 500;">${fullName}</span>,
               </p>
 
-              <p style="margin: 0 0 20px; color: #555555; font-size: 16px; line-height: 1.6;">
-                ¡Gracias por unirte a <strong>${brandName}</strong>!
+              <p style="margin: 0 0 28px; color: #94a3b8; font-size: 15px; line-height: 1.6;">
+                Tu cuenta ha sido verificada exitosamente. Ya puedes empezar a organizar tu trabajo con ${brandName}.
               </p>
 
-              <p style="margin: 0 0 30px; color: #555555; font-size: 15px; line-height: 1.6;">
-                Ahora puedes acceder a ideas diarias para crear contenido sin mostrar tu cara. Ya no te quedarás en blanco pensando qué publicar.
-              </p>
+              <!-- Features -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 28px;">
+                <tr>
+                  <td style="background-color: #0f172a; border-radius: 12px; padding: 24px;">
+                    <p style="margin: 0 0 16px; color: #e2e8f0; font-size: 14px; font-weight: 600;">
+                      Que puedes hacer:
+                    </p>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding: 6px 0; color: #94a3b8; font-size: 14px;">
+                          <span style="color: #3b82f6; margin-right: 8px;">&#10003;</span> Crear organizaciones y equipos
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #94a3b8; font-size: 14px;">
+                          <span style="color: #3b82f6; margin-right: 8px;">&#10003;</span> Gestionar proyectos con tableros Kanban
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #94a3b8; font-size: 14px;">
+                          <span style="color: #3b82f6; margin-right: 8px;">&#10003;</span> Asignar y dar seguimiento a tareas
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; color: #94a3b8; font-size: 14px;">
+                          <span style="color: #3b82f6; margin-right: 8px;">&#10003;</span> Planificar tu dia con tareas diarias
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
 
-              <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p style="margin: 0 0 10px; color: #333333; font-size: 15px; font-weight: 600;">
-                  ¿Qué sigue?
-                </p>
-                <ul style="margin: 0; padding-left: 20px; color: #555555; font-size: 14px; line-height: 1.8;">
-                  <li>Elige tu nicho favorito</li>
-                  <li>Revisa tu idea del día</li>
-                  <li>Copia, publica y crece</li>
-                </ul>
-              </div>
+              <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">
+                Si tienes preguntas, no dudes en contactarnos.
+              </p>
             </td>
           </tr>
 
+          <!-- Footer -->
           <tr>
-            <td style="background-color: #f8f9fa; padding: 30px; text-align: center;">
-              <p style="margin: 0 0 10px; color: #6c757d; font-size: 14px;">
-                <strong>${brandName}</strong>
-              </p>
-              <p style="margin: 0; color: #adb5bd; font-size: 12px;">
-                Tu copiloto de contenido
+            <td style="padding: 24px 40px; border-top: 1px solid #334155; text-align: center;">
+              <p style="margin: 0; color: #475569; font-size: 13px;">
+                ${brandName} &mdash; Gestion de tareas y proyectos
               </p>
             </td>
           </tr>

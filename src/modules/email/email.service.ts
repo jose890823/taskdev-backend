@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { google } from 'googleapis';
 import {
   SendEmailDto,
   SendOtpEmailDto,
@@ -16,38 +17,46 @@ import { getWelcomeEmailTemplate } from './templates/welcome.template';
 import { getPasswordResetTemplate } from './templates/password-reset.template';
 import { getInvitationEmailTemplate } from './templates/invitation.template';
 
-type EmailProvider = 'resend' | 'gmail' | 'none';
+type EmailProvider = 'resend' | 'gmail-api' | 'gmail' | 'none';
 
 /**
  * EmailService - Servicio de envío de correos
  *
  * Prioridad de proveedores:
- * 1. Resend (recomendado para producción)
- * 2. Gmail SMTP (backup/desarrollo)
- * 3. Modo simulado (solo logs)
+ * 1. Gmail API via HTTPS (funciona en Railway, no necesita puertos SMTP)
+ * 2. Resend (requiere dominio verificado)
+ * 3. Gmail SMTP (desarrollo local)
+ * 4. Modo simulado (solo logs)
  */
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend: Resend | null = null;
   private gmailTransporter: Transporter | null = null;
+  private gmailApiAuth: InstanceType<typeof google.auth.OAuth2> | null = null;
+  private gmailApiUser: string | null = null;
   private provider: EmailProvider = 'none';
   private readonly defaultFrom: string;
   private readonly brandName: string;
 
   constructor(private configService: ConfigService) {
     this.defaultFrom =
-      this.configService.get<string>('EMAIL_FROM') || 'noreply@michambita.com';
+      this.configService.get<string>('EMAIL_FROM') || 'noreply@taskhub.dev';
     this.brandName =
-      this.configService.get<string>('BRAND_NAME') || 'MiChambita';
+      this.configService.get<string>('BRAND_NAME') || 'TaskHub';
     this.initialize();
   }
 
   /**
-   * Inicializa el proveedor de email (Resend > Gmail > None)
+   * Inicializa el proveedor de email (Gmail API > Resend > Gmail SMTP > None)
    */
   private initialize(): void {
-    // Intentar Resend primero
+    // 1. Intentar Gmail API (HTTPS - funciona en Railway sin puertos SMTP)
+    if (this.initializeGmailApi()) {
+      return;
+    }
+
+    // 2. Intentar Resend (requiere dominio verificado)
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (resendApiKey && resendApiKey !== '') {
       try {
@@ -61,9 +70,50 @@ export class EmailService {
       }
     }
 
-    // Fallback a Gmail SMTP
+    // 3. Fallback a Gmail SMTP (solo local)
+    if (this.initializeGmailSmtp()) {
+      return;
+    }
+
+    // Sin proveedor configurado
+    this.provider = 'none';
+    this.logger.warn(
+      '⚠️ EmailService en modo simulado - Configura GMAIL_CLIENT_ID/GMAIL_CLIENT_SECRET/GMAIL_REFRESH_TOKEN o RESEND_API_KEY',
+    );
+  }
+
+  /**
+   * Inicializa Gmail API via OAuth2 (usa HTTPS, no SMTP)
+   */
+  private initializeGmailApi(): boolean {
+    const clientId = this.configService.get<string>('GMAIL_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('GMAIL_CLIENT_SECRET');
+    const refreshToken = this.configService.get<string>('GMAIL_REFRESH_TOKEN');
+    const gmailUser = this.configService.get<string>('GMAIL_USER');
+
+    if (clientId && clientSecret && refreshToken && gmailUser) {
+      try {
+        this.gmailApiAuth = new google.auth.OAuth2(clientId, clientSecret);
+        this.gmailApiAuth.setCredentials({ refresh_token: refreshToken });
+        this.gmailApiUser = gmailUser;
+        this.provider = 'gmail-api';
+        this.logger.log('✅ EmailService configurado con Gmail API (HTTPS)');
+        this.logger.log(`📧 Usando cuenta: ${gmailUser}`);
+        return true;
+      } catch (error) {
+        this.logger.warn('⚠️ Error inicializando Gmail API:', error.message);
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Inicializa Gmail SMTP (solo funciona en local, Railway bloquea puertos SMTP)
+   */
+  private initializeGmailSmtp(): boolean {
     const gmailUser = this.configService.get<string>('GMAIL_USER');
     const gmailPass = this.configService.get<string>('GMAIL_APP_PASSWORD');
+
     if (gmailUser && gmailPass && gmailUser !== '' && gmailPass !== '') {
       try {
         this.gmailTransporter = nodemailer.createTransport({
@@ -81,17 +131,12 @@ export class EmailService {
         this.provider = 'gmail';
         this.logger.log('✅ EmailService configurado con Gmail SMTP');
         this.logger.log(`📧 Usando cuenta: ${gmailUser}`);
-        return;
+        return true;
       } catch (error) {
         this.logger.warn('⚠️ Error inicializando Gmail SMTP:', error.message);
       }
     }
-
-    // Sin proveedor configurado
-    this.provider = 'none';
-    this.logger.warn(
-      '⚠️ EmailService en modo simulado - Configura RESEND_API_KEY o GMAIL_USER/GMAIL_APP_PASSWORD',
-    );
+    return false;
   }
 
   /**
@@ -106,6 +151,84 @@ export class EmailService {
    */
   getProvider(): EmailProvider {
     return this.provider;
+  }
+
+  /**
+   * Construye un email RFC 2822 en base64url para Gmail API
+   */
+  private buildRawEmail(params: {
+    from: string;
+    to: string | string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string;
+  }): string {
+    const to = Array.isArray(params.to) ? params.to.join(', ') : params.to;
+    const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const headers = [
+      `From: ${params.from}`,
+      `To: ${to}`,
+      `Subject: =?UTF-8?B?${Buffer.from(params.subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+    ];
+
+    if (params.replyTo) {
+      headers.push(`Reply-To: ${params.replyTo}`);
+    }
+
+    let body: string;
+    if (params.html && params.text) {
+      headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+      body = [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=UTF-8',
+        '',
+        params.text,
+        `--${boundary}`,
+        'Content-Type: text/html; charset=UTF-8',
+        '',
+        params.html,
+        `--${boundary}--`,
+      ].join('\r\n');
+    } else if (params.html) {
+      headers.push('Content-Type: text/html; charset=UTF-8');
+      body = params.html;
+    } else {
+      headers.push('Content-Type: text/plain; charset=UTF-8');
+      body = params.text || '';
+    }
+
+    const email = headers.join('\r\n') + '\r\n\r\n' + body;
+    return Buffer.from(email)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
+  /**
+   * Envía un email via Gmail API (HTTPS)
+   */
+  private async sendViaGmailApi(params: {
+    from: string;
+    to: string | string[];
+    subject: string;
+    html?: string;
+    text?: string;
+    replyTo?: string;
+  }): Promise<EmailResult> {
+    const gmail = google.gmail({ version: 'v1', auth: this.gmailApiAuth! });
+    const raw = this.buildRawEmail(params);
+
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw },
+    });
+
+    this.logger.log(`📧 Email enviado via Gmail API a ${params.to}`);
+    return { success: true, messageId: result.data.id || undefined };
   }
 
   /**
@@ -140,7 +263,19 @@ export class EmailService {
         return { success: true, messageId: result.data?.id };
       }
 
-      // Gmail
+      // Gmail API (HTTPS)
+      if (this.provider === 'gmail-api' && this.gmailApiAuth) {
+        return this.sendViaGmailApi({
+          from: `${this.brandName} <${this.gmailApiUser}>`,
+          to: dto.to,
+          subject: dto.subject,
+          html: dto.html,
+          text: dto.text,
+          replyTo: dto.replyTo,
+        });
+      }
+
+      // Gmail SMTP
       if (this.provider === 'gmail' && this.gmailTransporter) {
         const info = await this.gmailTransporter.sendMail({
           from,
@@ -282,6 +417,23 @@ export class EmailService {
         provider: 'resend',
         message: 'Resend configurado correctamente',
       };
+    }
+
+    if (this.provider === 'gmail-api' && this.gmailApiAuth) {
+      try {
+        await this.gmailApiAuth.getAccessToken();
+        return {
+          success: true,
+          provider: 'gmail-api',
+          message: 'Gmail API (HTTPS) conectado correctamente',
+        };
+      } catch (error) {
+        return {
+          success: false,
+          provider: 'gmail-api',
+          message: error.message,
+        };
+      }
     }
 
     if (this.provider === 'gmail' && this.gmailTransporter) {
