@@ -1,5 +1,5 @@
 import {
-  Injectable, Logger, NotFoundException, BadRequestException,
+  Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -8,8 +8,11 @@ import { Task, TaskType } from './entities/task.entity';
 import { TaskAssignee } from './entities/task-assignee.entity';
 import { CreateTaskDto, UpdateTaskDto, BulkPositionItemDto } from './dto';
 import { TaskStatusesService } from '../task-statuses/task-statuses.service';
+import { ProjectsService } from '../projects/projects.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { User } from '../auth/entities/user.entity';
 import { isUuid } from '../../common/utils/identifier.util';
+import { canCreateTask, canEditTask, canDeleteTask } from '../../common/utils/task-permissions.util';
 import { Comment } from '../comments/entities/comment.entity';
 import { TaskCommentRead } from '../comments/entities/task-comment-read.entity';
 
@@ -23,6 +26,8 @@ export class TasksService {
     @InjectRepository(TaskAssignee)
     private readonly taskAssigneeRepository: Repository<TaskAssignee>,
     private readonly taskStatusesService: TaskStatusesService,
+    private readonly projectsService: ProjectsService,
+    private readonly organizationsService: OrganizationsService,
     private readonly dataSource: DataSource,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -78,7 +83,7 @@ export class TasksService {
     type?: TaskType;
     page?: number;
     limit?: number;
-  }, currentUserId?: string): Promise<{ data: any[]; total: number }> {
+  }, currentUserId?: string, isSuperAdmin = false): Promise<{ data: any[]; total: number }> {
     const { page = 1, limit = 50, ...where } = filters;
     const qb = this.taskRepository.createQueryBuilder('t')
       .where('t.parentId IS NULL');
@@ -93,6 +98,14 @@ export class TasksService {
       );
     }
     if (where.type) qb.andWhere('t.type = :type', { type: where.type });
+
+    // Scope filtering: limit to user's accessible tasks when no project/org filter
+    if (!where.projectId && !where.organizationId && currentUserId && !isSuperAdmin) {
+      qb.andWhere(
+        '(t.createdById = :uid OR t.assignedToId = :uid OR t.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :uid) OR t.projectId IN (SELECT pm."projectId" FROM project_members pm WHERE pm."userId" = :uid))',
+        { uid: currentUserId },
+      );
+    }
 
     const [tasks, total] = await qb
       .orderBy('t.position', 'ASC')
@@ -232,7 +245,7 @@ export class TasksService {
     return { data, total };
   }
 
-  async findMyTasks(userId: string, type?: TaskType): Promise<Task[]> {
+  async findMyTasks(userId: string, type?: TaskType): Promise<any[]> {
     const qb = this.taskRepository.createQueryBuilder('t')
       .where(
         '(t.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :userId) OR t.assignedToId = :userId OR t.createdById = :userId)',
@@ -242,13 +255,14 @@ export class TasksService {
 
     if (type) qb.andWhere('t.type = :type', { type });
 
-    return qb.orderBy('t.position', 'ASC').addOrderBy('t.createdAt', 'DESC').getMany();
+    const tasks = await qb.orderBy('t.position', 'ASC').addOrderBy('t.createdAt', 'DESC').getMany();
+    return this.hydrateTasks(tasks);
   }
 
-  async findDailyTasks(userId: string, date?: string): Promise<Task[]> {
+  async findDailyTasks(userId: string, date?: string): Promise<any[]> {
     const targetDate = date || new Date().toISOString().split('T')[0];
 
-    return this.taskRepository
+    const tasks = await this.taskRepository
       .createQueryBuilder('t')
       .where('t.type = :type', { type: TaskType.DAILY })
       .andWhere(
@@ -258,6 +272,40 @@ export class TasksService {
       .andWhere('t.scheduledDate = :date', { date: targetDate })
       .orderBy('t.position', 'ASC')
       .getMany();
+    return this.hydrateTasks(tasks);
+  }
+
+  /** Hydrate assignees for a list of tasks (reused by findMyTasks, findDailyTasks) */
+  private async hydrateTasks(tasks: Task[]): Promise<any[]> {
+    if (tasks.length === 0) return [];
+
+    const taskIds = tasks.map(t => t.id);
+
+    const assignees = await this.taskAssigneeRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.user', 'u')
+      .where('ta.taskId IN (:...taskIds)', { taskIds })
+      .select(['ta.id', 'ta.taskId', 'ta.userId', 'u.id', 'u.firstName', 'u.lastName', 'u.email'])
+      .getMany();
+
+    const assigneesByTask: Record<string, { id: string; firstName: string; lastName: string; email: string }[]> = {};
+    for (const a of assignees) {
+      if (!assigneesByTask[a.taskId]) assigneesByTask[a.taskId] = [];
+      if (a.user) {
+        assigneesByTask[a.taskId].push({
+          id: a.user.id,
+          firstName: a.user.firstName,
+          lastName: a.user.lastName,
+          email: a.user.email,
+        });
+      }
+    }
+
+    return tasks.map(task => ({
+      ...task,
+      assignees: assigneesByTask[task.id] || [],
+      assignedTo: assigneesByTask[task.id]?.[0] || null,
+    }));
   }
 
   async findById(identifier: string): Promise<Task> {
@@ -499,6 +547,67 @@ export class TasksService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  // ── Access verification ──
+
+  async verifyTaskAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+    const task = await this.findById(taskId);
+    if (isSuperAdmin) return task;
+    if (task.createdById === userId) return task;
+    if (task.assignedToId === userId) return task;
+    const isAssignee = await this.taskAssigneeRepository.findOne({ where: { taskId: task.id, userId } });
+    if (isAssignee) return task;
+    if (task.projectId) {
+      const isMember = await this.projectsService.isMember(task.projectId, userId);
+      if (isMember) return task;
+    }
+    throw new ForbiddenException('No tienes acceso a esta tarea');
+  }
+
+  async verifyProjectAccess(projectId: string, userId: string, isSuperAdmin = false): Promise<void> {
+    await this.projectsService.verifyMemberAccess(projectId, userId, isSuperAdmin);
+  }
+
+  async verifyOrganizationAccess(organizationId: string, userId: string, isSuperAdmin = false): Promise<void> {
+    await this.organizationsService.verifyMemberAccess(organizationId, userId, isSuperAdmin);
+  }
+
+  async verifyTaskCreateAccess(projectId: string | null, userId: string, isSuperAdmin = false): Promise<void> {
+    if (isSuperAdmin || !projectId) return;
+    const role = await this.projectsService.getMemberRole(projectId, userId);
+    if (!canCreateTask(role)) {
+      throw new ForbiddenException('No tienes permisos para crear tareas en este proyecto');
+    }
+  }
+
+  async verifyTaskEditAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+    const task = await this.findById(taskId);
+    if (isSuperAdmin) return task;
+    if (!task.projectId) {
+      if (task.createdById !== userId) throw new ForbiddenException('No tienes acceso a esta tarea');
+      return task;
+    }
+    const role = await this.projectsService.getMemberRole(task.projectId, userId);
+    const isCreator = task.createdById === userId;
+    if (!canEditTask(role, isCreator)) {
+      throw new ForbiddenException('No tienes permisos para editar esta tarea');
+    }
+    return task;
+  }
+
+  async verifyTaskDeleteAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+    const task = await this.findById(taskId);
+    if (isSuperAdmin) return task;
+    if (!task.projectId) {
+      if (task.createdById !== userId) throw new ForbiddenException('No tienes acceso a esta tarea');
+      return task;
+    }
+    const role = await this.projectsService.getMemberRole(task.projectId, userId);
+    if (!canDeleteTask(role)) {
+      throw new ForbiddenException('No tienes permisos para eliminar tareas en este proyecto');
+    }
+    return task;
   }
 
   // ── Helpers ──

@@ -17,6 +17,10 @@ export class TasksController {
   @Post()
   @ApiOperation({ summary: 'Crear tarea' })
   async create(@Body() dto: CreateTaskDto, @CurrentUser() user: User) {
+    await this.tasksService.verifyTaskCreateAccess(dto.projectId || null, user.id, user.isSuperAdmin());
+    if (dto.organizationId) {
+      await this.tasksService.verifyOrganizationAccess(dto.organizationId, user.id, user.isSuperAdmin());
+    }
     return this.tasksService.create(dto, user);
   }
 
@@ -39,11 +43,17 @@ export class TasksController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    if (projectId) {
+      await this.tasksService.verifyProjectAccess(projectId, user.id, user.isSuperAdmin());
+    }
+    if (organizationId) {
+      await this.tasksService.verifyOrganizationAccess(organizationId, user.id, user.isSuperAdmin());
+    }
     return this.tasksService.findAll({
       projectId, organizationId, statusId, assignedToId, type,
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,
-    }, user.id);
+    }, user.id, user.isSuperAdmin());
   }
 
   @Get('my')
@@ -62,32 +72,39 @@ export class TasksController {
 
   @Patch('bulk-positions')
   @ApiOperation({ summary: 'Actualizar posiciones y estados en bulk (drag & drop)' })
-  async bulkUpdatePositions(@Body() dto: BulkUpdatePositionsDto) {
+  async bulkUpdatePositions(@Body() dto: BulkUpdatePositionsDto, @CurrentUser() user: User) {
+    for (const item of dto.items) {
+      await this.tasksService.verifyTaskEditAccess(item.id, user.id, user.isSuperAdmin());
+    }
     return this.tasksService.bulkUpdatePositions(dto.items);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener tarea por ID con asignados' })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
     return this.tasksService.findByIdWithAssignees(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar tarea' })
   async update(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentUser() user: User) {
+    await this.tasksService.verifyTaskEditAccess(id, user.id, user.isSuperAdmin());
     return this.tasksService.update(id, dto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar tarea' })
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.tasksService.verifyTaskDeleteAccess(id, user.id, user.isSuperAdmin());
     await this.tasksService.remove(id);
     return { message: 'Tarea eliminada' };
   }
 
   @Get(':id/subtasks')
   @ApiOperation({ summary: 'Obtener subtareas' })
-  async getSubtasks(@Param('id') id: string) {
+  async getSubtasks(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
     return this.tasksService.getSubtasks(id);
   }
 
@@ -98,6 +115,8 @@ export class TasksController {
     @Body() dto: CreateTaskDto,
     @CurrentUser() user: User,
   ) {
+    const parent = await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
+    await this.tasksService.verifyTaskCreateAccess(parent.projectId || null, user.id, user.isSuperAdmin());
     return this.tasksService.createSubtask(id, dto, user);
   }
 }
