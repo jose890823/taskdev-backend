@@ -937,6 +937,39 @@ export class AuthService {
     return userWithoutSensitive;
   }
 
+  /**
+   * MCP SCOPES: Retorna los scopes permitidos para el usuario
+   * Preparado para filtrado por plan de suscripción en el futuro
+   */
+  async getMcpScopes(user: User): Promise<{ scopes: string[] }> {
+    const allScopes = [
+      'tasks:read',
+      'tasks:write',
+      'projects:read',
+      'projects:write',
+      'organizations:read',
+      'organizations:write',
+      'comments:read',
+      'comments:write',
+      'notifications:read',
+      'notifications:write',
+      'activity:read',
+      'invitations:read',
+      'invitations:write',
+      'modules:read',
+      'modules:write',
+      'statuses:read',
+      'statuses:write',
+      'search',
+    ];
+
+    // Futuro: filtrar por plan del usuario
+    // const userPlan = await this.plansService.getUserPlan(user.id);
+    // return { scopes: userPlan.allowedScopes };
+
+    return { scopes: allScopes };
+  }
+
   // ==================== MÉTODOS HELPERS PRIVADOS ====================
 
   /**

@@ -655,6 +655,56 @@ export class AuthController {
     return this.authService.confirmChangePassword(userId, confirmDto);
   }
 
+  @Get('mcp-scopes')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Obtener scopes MCP del usuario',
+    description:
+      'Retorna los scopes/permisos disponibles para el usuario autenticado en el MCP Server. Preparado para filtrado por plan de suscripción.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Scopes obtenidos exitosamente',
+    type: StandardResponseDto,
+    schema: {
+      example: {
+        success: true,
+        data: {
+          scopes: [
+            'tasks:read',
+            'tasks:write',
+            'projects:read',
+            'projects:write',
+            'organizations:read',
+            'organizations:write',
+            'comments:read',
+            'comments:write',
+            'notifications:read',
+            'notifications:write',
+            'activity:read',
+            'invitations:read',
+            'invitations:write',
+            'modules:read',
+            'modules:write',
+            'statuses:read',
+            'statuses:write',
+            'search',
+          ],
+        },
+        timestamp: '2026-02-19T10:00:00.000Z',
+        path: '/api/auth/mcp-scopes',
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+    type: ErrorResponseDto,
+  })
+  async getMcpScopes(@CurrentUser() user: User) {
+    return this.authService.getMcpScopes(user);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
