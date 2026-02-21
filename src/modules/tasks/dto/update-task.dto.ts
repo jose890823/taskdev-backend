@@ -56,6 +56,12 @@ export class UpdateTaskDto {
   @IsDateString({}, { message: 'dueDate debe ser una fecha valida' })
   dueDate?: string | null;
 
+  @ApiProperty({ required: false, nullable: true, description: 'UUID del modulo de proyecto (null para quitar)' })
+  @IsOptional()
+  @ValidateIf((o) => o.moduleId !== null)
+  @IsUUID('4', { message: 'moduleId debe ser un UUID valido o null' })
+  moduleId?: string | null;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsInt()
