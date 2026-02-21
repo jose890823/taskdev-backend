@@ -16,6 +16,7 @@ export class CommentsController {
   @Post()
   @ApiOperation({ summary: 'Crear comentario' })
   async create(@Body() dto: CreateCommentDto, @CurrentUser() user: User) {
+    await this.commentsService.verifyTaskAccess(dto.taskId, user.id, user.isSuperAdmin());
     return this.commentsService.create(dto, user);
   }
 
@@ -25,6 +26,7 @@ export class CommentsController {
     @Param('taskId', ParseUUIDPipe) taskId: string,
     @CurrentUser() user: User,
   ) {
+    await this.commentsService.verifyTaskAccess(taskId, user.id, user.isSuperAdmin());
     return this.commentsService.findByTask(taskId, user.id);
   }
 

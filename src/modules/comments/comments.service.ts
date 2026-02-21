@@ -10,6 +10,7 @@ import { CreateCommentDto, UpdateCommentDto } from './dto';
 import { User } from '../auth/entities/user.entity';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAssignee } from '../tasks/entities/task-assignee.entity';
+import { TasksService } from '../tasks/tasks.service';
 
 @Injectable()
 export class CommentsService {
@@ -20,9 +21,14 @@ export class CommentsService {
     private readonly commentRepository: Repository<Comment>,
     @InjectRepository(TaskCommentRead)
     private readonly taskCommentReadRepository: Repository<TaskCommentRead>,
+    private readonly tasksService: TasksService,
     private readonly dataSource: DataSource,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  async verifyTaskAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<void> {
+    await this.tasksService.verifyTaskAccess(taskId, userId, isSuperAdmin);
+  }
 
   async create(dto: CreateCommentDto, user: User): Promise<any> {
     const comment = this.commentRepository.create({
