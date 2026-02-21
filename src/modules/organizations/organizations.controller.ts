@@ -31,8 +31,10 @@ export class OrganizationsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener organizacion por ID' })
-  async findOne(@Param('id') id: string) {
-    return this.organizationsService.findById(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    const org = await this.organizationsService.findById(id);
+    await this.organizationsService.verifyMemberAccess(org.id, user.id, user.isSuperAdmin());
+    return org;
   }
 
   @Patch(':id')
@@ -54,7 +56,9 @@ export class OrganizationsController {
 
   @Get(':id/members')
   @ApiOperation({ summary: 'Listar miembros de la organizacion' })
-  async getMembers(@Param('id') id: string) {
+  async getMembers(@Param('id') id: string, @CurrentUser() user: User) {
+    const org = await this.organizationsService.findById(id);
+    await this.organizationsService.verifyMemberAccess(org.id, user.id, user.isSuperAdmin());
     return this.organizationsService.getMembers(id);
   }
 

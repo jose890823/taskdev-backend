@@ -148,6 +148,16 @@ export class OrganizationsService {
     return !!member;
   }
 
+  async verifyMemberAccess(organizationId: string, userId: string, isSuperAdmin = false): Promise<void> {
+    if (isSuperAdmin) return;
+    const member = await this.memberRepository.findOne({
+      where: { organizationId, userId },
+    });
+    if (!member) {
+      throw new ForbiddenException('No tienes acceso a esta organizacion');
+    }
+  }
+
   private async verifyAdminAccess(organizationId: string, userId: string): Promise<void> {
     const member = await this.memberRepository.findOne({
       where: { organizationId, userId },
