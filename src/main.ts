@@ -58,6 +58,15 @@ async function bootstrap() {
     'http://localhost:3002',
   ];
 
+  // Produccion: agregar origenes desde CORS_ORIGIN (comma-separated)
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (corsOrigin) {
+    corsOrigin.split(',').forEach(o => {
+      const trimmed = o.trim();
+      if (trimmed) allowedOrigins.push(trimmed);
+    });
+  }
+
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) {
