@@ -33,14 +33,22 @@ export class ProjectsController {
 
   @Get('by-slug/:slug')
   @ApiOperation({ summary: 'Obtener proyecto por slug' })
-  async findBySlug(@Param('slug') slug: string) {
-    return this.projectsService.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string, @CurrentUser() user: User) {
+    const project = await this.projectsService.findBySlug(slug);
+    if (!user.isSuperAdmin() && project.ownerId !== user.id) {
+      await this.projectsService.verifyMemberAccess(project.id, user.id);
+    }
+    return project;
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener proyecto por ID' })
-  async findOne(@Param('id') id: string) {
-    return this.projectsService.findById(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    const project = await this.projectsService.findById(id);
+    if (!user.isSuperAdmin() && project.ownerId !== user.id) {
+      await this.projectsService.verifyMemberAccess(project.id, user.id);
+    }
+    return project;
   }
 
   @Patch(':id')
@@ -62,7 +70,11 @@ export class ProjectsController {
 
   @Get(':id/members')
   @ApiOperation({ summary: 'Listar miembros del proyecto' })
-  async getMembers(@Param('id') id: string) {
+  async getMembers(@Param('id') id: string, @CurrentUser() user: User) {
+    const project = await this.projectsService.findById(id);
+    if (!user.isSuperAdmin() && project.ownerId !== user.id) {
+      await this.projectsService.verifyMemberAccess(project.id, user.id);
+    }
     return this.projectsService.getMembers(id);
   }
 

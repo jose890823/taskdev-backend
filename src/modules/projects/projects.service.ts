@@ -164,6 +164,24 @@ export class ProjectsService {
     return !!member && (member.role === ProjectRole.OWNER || member.role === ProjectRole.ADMIN);
   }
 
+  async isMember(projectId: string, userId: string): Promise<boolean> {
+    const member = await this.memberRepository.findOne({ where: { projectId, userId } });
+    return !!member;
+  }
+
+  async getMemberRole(projectId: string, userId: string): Promise<ProjectRole | null> {
+    const member = await this.memberRepository.findOne({ where: { projectId, userId } });
+    return member?.role || null;
+  }
+
+  async verifyMemberAccess(projectId: string, userId: string, isSuperAdmin = false): Promise<void> {
+    if (isSuperAdmin) return;
+    const member = await this.memberRepository.findOne({ where: { projectId, userId } });
+    if (!member) {
+      throw new ForbiddenException('No tienes acceso a este proyecto');
+    }
+  }
+
   async addMemberByUserId(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
     const existing = await this.memberRepository.findOne({
       where: { projectId, userId },
