@@ -77,6 +77,7 @@ export class TasksService {
 
   async findAll(filters: {
     projectId?: string;
+    projectIds?: string[];
     organizationId?: string;
     statusId?: string;
     assignedToId?: string;
@@ -88,7 +89,11 @@ export class TasksService {
     const qb = this.taskRepository.createQueryBuilder('t')
       .where('t.parentId IS NULL');
 
-    if (where.projectId) qb.andWhere('t.projectId = :projectId', { projectId: where.projectId });
+    if (where.projectIds && where.projectIds.length > 0) {
+      qb.andWhere('t.projectId IN (:...projectIds)', { projectIds: where.projectIds });
+    } else if (where.projectId) {
+      qb.andWhere('t.projectId = :projectId', { projectId: where.projectId });
+    }
     if (where.organizationId) qb.andWhere('t.organizationId = :organizationId', { organizationId: where.organizationId });
     if (where.statusId) qb.andWhere('t.statusId = :statusId', { statusId: where.statusId });
     if (where.assignedToId) {
@@ -100,7 +105,7 @@ export class TasksService {
     if (where.type) qb.andWhere('t.type = :type', { type: where.type });
 
     // Scope filtering: limit to user's accessible tasks when no project/org filter
-    if (!where.projectId && !where.organizationId && currentUserId && !isSuperAdmin) {
+    if (!where.projectId && !(where.projectIds && where.projectIds.length > 0) && !where.organizationId && currentUserId && !isSuperAdmin) {
       qb.andWhere(
         '(t.createdById = :uid OR t.assignedToId = :uid OR t.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :uid) OR t.projectId IN (SELECT pm."projectId" FROM project_members pm WHERE pm."userId" = :uid))',
         { uid: currentUserId },
@@ -199,15 +204,27 @@ export class TasksService {
       // Batch check for tasks that have been read before: are there newer comments?
       const readTaskIds = Object.keys(readMap).filter(tid => commentCountMap[tid]);
       if (readTaskIds.length > 0) {
-        for (const tid of readTaskIds) {
-          const newerCount = await this.dataSource
-            .getRepository(Comment)
-            .createQueryBuilder('c')
-            .where('c.taskId = :taskId', { taskId: tid })
-            .andWhere('c.deletedAt IS NULL')
-            .andWhere('c.createdAt > :lastRead', { lastRead: readMap[tid] })
-            .getCount();
-          if (newerCount > 0) unreadMap[tid] = true;
+        // Build a single batch query instead of N individual queries
+        const conditions = readTaskIds.map((tid, i) => {
+          return `(c."taskId" = :tid${i} AND c."createdAt" > :lr${i})`;
+        });
+        const params: Record<string, any> = {};
+        readTaskIds.forEach((tid, i) => {
+          params[`tid${i}`] = tid;
+          params[`lr${i}`] = readMap[tid];
+        });
+
+        const unreadResults = await this.dataSource
+          .getRepository(Comment)
+          .createQueryBuilder('c')
+          .select('DISTINCT c.taskId', 'taskId')
+          .where(`(${conditions.join(' OR ')})`)
+          .andWhere('c.deletedAt IS NULL')
+          .setParameters(params)
+          .getRawMany<{ taskId: string }>();
+
+        for (const row of unreadResults) {
+          unreadMap[row.taskId] = true;
         }
       }
     }

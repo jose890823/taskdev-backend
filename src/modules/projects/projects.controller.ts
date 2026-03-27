@@ -23,12 +23,14 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Listar proyectos' })
   @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'personal', required: false, type: Boolean })
+  @ApiQuery({ name: 'includeChildren', required: false, type: Boolean, description: 'Incluir sub-proyectos en el listado (por defecto false)' })
   async findAll(
     @CurrentUser() user: User,
     @Query('organizationId') organizationId?: string,
     @Query('personal') personal?: string,
+    @Query('includeChildren') includeChildren?: string,
   ) {
-    return this.projectsService.findAll(user.id, organizationId, personal === 'true');
+    return this.projectsService.findAll(user.id, organizationId, personal === 'true', includeChildren === 'true');
   }
 
   @Get('by-slug/:slug')
@@ -39,6 +41,16 @@ export class ProjectsController {
       await this.projectsService.verifyMemberAccess(project.id, user.id);
     }
     return project;
+  }
+
+  @Get(':id/children')
+  @ApiOperation({ summary: 'Listar sub-proyectos de un proyecto' })
+  async findChildren(@Param('id') id: string, @CurrentUser() user: User) {
+    const project = await this.projectsService.findById(id);
+    if (!user.isSuperAdmin()) {
+      await this.projectsService.verifyMemberAccess(project.id, user.id);
+    }
+    return this.projectsService.findChildren(id);
   }
 
   @Get(':id')

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
@@ -27,6 +27,7 @@ export class TasksController {
   @Get()
   @ApiOperation({ summary: 'Listar tareas con filtros' })
   @ApiQuery({ name: 'projectId', required: false })
+  @ApiQuery({ name: 'projectIds', required: false, description: 'UUIDs de proyectos separados por coma (ej: uuid1,uuid2,uuid3)' })
   @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'statusId', required: false })
   @ApiQuery({ name: 'assignedToId', required: false })
@@ -36,6 +37,7 @@ export class TasksController {
   async findAll(
     @CurrentUser() user: User,
     @Query('projectId') projectId?: string,
+    @Query('projectIds') projectIds?: string,
     @Query('organizationId') organizationId?: string,
     @Query('statusId') statusId?: string,
     @Query('assignedToId') assignedToId?: string,
@@ -46,13 +48,24 @@ export class TasksController {
     if (projectId) {
       await this.tasksService.verifyProjectAccess(projectId, user.id, user.isSuperAdmin());
     }
+    const parsedProjectIds = projectIds
+      ? projectIds.split(',').map(id => id.trim()).filter(Boolean)
+      : undefined;
+    if (parsedProjectIds && parsedProjectIds.length > 10) {
+      throw new BadRequestException('No se pueden consultar mas de 10 proyectos a la vez');
+    }
+    if (parsedProjectIds && parsedProjectIds.length > 0) {
+      for (const pid of parsedProjectIds) {
+        await this.tasksService.verifyProjectAccess(pid, user.id, user.isSuperAdmin());
+      }
+    }
     if (organizationId) {
       await this.tasksService.verifyOrganizationAccess(organizationId, user.id, user.isSuperAdmin());
     }
     return this.tasksService.findAll({
-      projectId, organizationId, statusId, assignedToId, type,
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      projectId, projectIds: parsedProjectIds, organizationId, statusId, assignedToId, type,
+      page: page ? Math.max(1, parseInt(page) || 1) : undefined,
+      limit: limit ? Math.min(100, Math.max(1, parseInt(limit) || 20)) : undefined,
     }, user.id, user.isSuperAdmin());
   }
 

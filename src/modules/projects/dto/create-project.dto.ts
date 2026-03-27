@@ -22,4 +22,9 @@ export class CreateProjectDto {
   @IsOptional()
   @IsUUID('4', { message: 'organizationId debe ser UUID valido' })
   organizationId?: string;
+
+  @ApiProperty({ description: 'ID del proyecto padre (para sub-proyectos)', required: false })
+  @IsOptional()
+  @IsUUID('4', { message: 'parentId debe ser UUID valido' })
+  parentId?: string;
 }

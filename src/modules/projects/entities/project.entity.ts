@@ -1,6 +1,6 @@
 import {
   Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index, BeforeInsert,
+  DeleteDateColumn, Index, BeforeInsert, ManyToOne, OneToMany, JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
@@ -9,6 +9,7 @@ import { generateSystemCode } from '../../../common/utils/system-code-generator.
 @Index(['slug'])
 @Index(['ownerId'])
 @Index(['organizationId'])
+@Index(['parentId'])
 export class Project {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -45,6 +46,17 @@ export class Project {
   @ApiProperty({ description: 'ID de la organizacion (null = proyecto personal)', required: false })
   @Column({ type: 'uuid', nullable: true })
   organizationId: string | null;
+
+  @ApiProperty({ description: 'ID del proyecto padre (null = proyecto raiz)', required: false })
+  @Column({ type: 'uuid', nullable: true })
+  parentId: string | null;
+
+  @ManyToOne(() => Project, (p) => p.children, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'parentId' })
+  parent: Project | null;
+
+  @OneToMany(() => Project, (p) => p.parent)
+  children: Project[];
 
   @ApiProperty({ example: true })
   @Column({ type: 'boolean', default: true })
