@@ -109,7 +109,12 @@ export class NotificationsAdminController {
   ): Promise<{
     data: Notification[];
     unreadCount: number;
-    pagination: { total: number; page: number; limit: number; totalPages: number };
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     return this.notificationsService.findByUser(userId, query);
   }

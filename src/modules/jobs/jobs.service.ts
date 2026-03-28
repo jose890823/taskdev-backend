@@ -45,10 +45,9 @@ export class JobsService implements OnModuleInit {
       // Los jobs programados se registraran segun las necesidades del proyecto
 
       this.logger.log('JobsModule inicializado exitosamente');
-    } catch (error) {
-      this.logger.error(
-        `Error al inicializar JobsModule: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error al inicializar JobsModule: ${msg}`);
       this.logger.warn(
         'Los jobs no se pudieron registrar. Verifique la conexion a Redis.',
       );

@@ -51,10 +51,10 @@ export class SeederService implements OnApplicationBootstrap {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(
         'Error verificando/sincronizando tablas:',
-        error.message,
+        error instanceof Error ? error.message : String(error),
       );
       return false;
     }
@@ -65,7 +65,7 @@ export class SeederService implements OnApplicationBootstrap {
    */
   private async checkTableExists(tableName: string): Promise<boolean> {
     try {
-      const result = await this.dataSource.query(
+      const result: unknown = await this.dataSource.query(
         `SELECT EXISTS (
           SELECT FROM information_schema.tables
           WHERE table_schema = 'public'
@@ -73,7 +73,8 @@ export class SeederService implements OnApplicationBootstrap {
         )`,
         [tableName],
       );
-      return result[0]?.exists === true;
+      const rows = result as Array<{ exists: boolean }>;
+      return rows[0]?.exists === true;
     } catch {
       return false;
     }
@@ -125,8 +126,10 @@ export class SeederService implements OnApplicationBootstrap {
   private async seedGlobalTaskStatuses(): Promise<void> {
     try {
       await this.taskStatusesService.createGlobalDefaults();
-    } catch (error) {
-      this.logger.warn(`Error creando task statuses globales: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Error creando task statuses globales: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -148,7 +151,7 @@ export class SeederService implements OnApplicationBootstrap {
         if (!tableExists) continue;
 
         // Check if systemCode column exists
-        const columnExists = await this.dataSource.query(
+        const columnExistsRaw: unknown = await this.dataSource.query(
           `SELECT EXISTS (
             SELECT FROM information_schema.columns
             WHERE table_schema = 'public'
@@ -157,11 +160,13 @@ export class SeederService implements OnApplicationBootstrap {
           )`,
           [tableName],
         );
+        const columnExists = columnExistsRaw as Array<{ exists: boolean }>;
         if (!columnExists[0]?.exists) continue;
 
-        const rows = await this.dataSource.query(
+        const rowsRaw: unknown = await this.dataSource.query(
           `SELECT id FROM "${tableName}" WHERE "systemCode" IS NULL`,
         );
+        const rows = rowsRaw as Array<{ id: string }>;
 
         if (rows.length === 0) continue;
 
@@ -177,9 +182,9 @@ export class SeederService implements OnApplicationBootstrap {
         this.logger.log(
           `Backfill: ${rows.length} registros de ${tableName} actualizados con systemCode`,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         this.logger.warn(
-          `Backfill: Error procesando ${tableName}: ${error.message}`,
+          `Backfill: Error procesando ${tableName}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }

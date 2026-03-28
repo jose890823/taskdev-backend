@@ -20,8 +20,8 @@ export class BlockedIpService {
     private readonly blockedIpRepository: Repository<BlockedIP>,
     private readonly securityEventService: SecurityEventService,
   ) {
-    // Cargar cache inicial
-    this.refreshCache();
+    // Cargar cache inicial (fire-and-forget: errores se loguean internamente)
+    void this.refreshCache();
   }
 
   /**

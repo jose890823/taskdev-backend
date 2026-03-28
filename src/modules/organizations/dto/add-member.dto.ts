@@ -8,7 +8,11 @@ export class AddMemberDto {
   @IsUUID('4', { message: 'userId debe ser un UUID valido' })
   userId: string;
 
-  @ApiProperty({ enum: OrganizationRole, example: 'member', description: 'Rol en la organizacion' })
+  @ApiProperty({
+    enum: OrganizationRole,
+    example: 'member',
+    description: 'Rol en la organizacion',
+  })
   @IsNotEmpty({ message: 'El rol es obligatorio' })
   @IsEnum(OrganizationRole, { message: 'Rol no valido' })
   role: OrganizationRole;

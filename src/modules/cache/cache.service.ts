@@ -60,10 +60,9 @@ export class CacheService implements OnModuleDestroy {
         return null;
       }
       return JSON.parse(data) as T;
-    } catch (error) {
-      this.logger.warn(
-        `Error al obtener clave "${key}" del cache: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al obtener clave "${key}" del cache: ${msg}`);
       return null;
     }
   }
@@ -74,14 +73,17 @@ export class CacheService implements OnModuleDestroy {
    * @param value - Valor a almacenar (se serializa a JSON)
    * @param ttlSeconds - Tiempo de vida en segundos (por defecto 300 = 5 min)
    */
-  async set(key: string, value: any, ttlSeconds: number = 300): Promise<void> {
+  async set(
+    key: string,
+    value: unknown,
+    ttlSeconds: number = 300,
+  ): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
       await this.client.set(key, serialized, 'EX', ttlSeconds);
-    } catch (error) {
-      this.logger.warn(
-        `Error al establecer clave "${key}" en cache: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al establecer clave "${key}" en cache: ${msg}`);
     }
   }
 
@@ -91,10 +93,9 @@ export class CacheService implements OnModuleDestroy {
   async del(key: string): Promise<void> {
     try {
       await this.client.del(key);
-    } catch (error) {
-      this.logger.warn(
-        `Error al eliminar clave "${key}" del cache: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al eliminar clave "${key}" del cache: ${msg}`);
     }
   }
 
@@ -135,10 +136,9 @@ export class CacheService implements OnModuleDestroy {
         `Eliminadas ${deletedCount} claves con patron "${pattern}"`,
       );
       return deletedCount;
-    } catch (error) {
-      this.logger.warn(
-        `Error al eliminar por patron "${pattern}": ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al eliminar por patron "${pattern}": ${msg}`);
       return 0;
     }
   }
@@ -150,9 +150,10 @@ export class CacheService implements OnModuleDestroy {
     try {
       const result = await this.client.exists(key);
       return result === 1;
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Error al verificar existencia de clave "${key}": ${error.message}`,
+        `Error al verificar existencia de clave "${key}": ${msg}`,
       );
       return false;
     }
@@ -165,10 +166,9 @@ export class CacheService implements OnModuleDestroy {
   async ttl(key: string): Promise<number> {
     try {
       return await this.client.ttl(key);
-    } catch (error) {
-      this.logger.warn(
-        `Error al obtener TTL de clave "${key}": ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al obtener TTL de clave "${key}": ${msg}`);
       return -2;
     }
   }
@@ -264,10 +264,9 @@ export class CacheService implements OnModuleDestroy {
         total > 0 ? `${((hits / total) * 100).toFixed(2)}%` : '0.00%';
 
       return { keys: keysCount, memory, uptime, hitRate };
-    } catch (error) {
-      this.logger.warn(
-        `Error al obtener estadisticas de Redis: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al obtener estadisticas de Redis: ${msg}`);
       return { keys: 0, memory: '0B', uptime: 0, hitRate: '0.00%' };
     }
   }
@@ -305,9 +304,10 @@ export class CacheService implements OnModuleDestroy {
       } while (cursor !== '0');
 
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Error al listar claves con patron "${pattern}": ${error.message}`,
+        `Error al listar claves con patron "${pattern}": ${msg}`,
       );
       return [];
     }
@@ -330,8 +330,9 @@ export class CacheService implements OnModuleDestroy {
       // flushdb solo limpia la BD actual, no todo Redis
       await this.client.flushdb();
       this.logger.log('Cache vaciado completamente (flushdb)');
-    } catch (error) {
-      this.logger.warn(`Error al vaciar el cache: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al vaciar el cache: ${msg}`);
     }
   }
 
@@ -342,8 +343,9 @@ export class CacheService implements OnModuleDestroy {
     try {
       const result = await this.client.ping();
       return result === 'PONG';
-    } catch (error) {
-      this.logger.warn(`Redis health check fallido: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Redis health check fallido: ${msg}`);
       return false;
     }
   }
@@ -359,8 +361,9 @@ export class CacheService implements OnModuleDestroy {
     try {
       await this.client.quit();
       this.logger.log('Conexion a Redis cerrada correctamente');
-    } catch (error) {
-      this.logger.warn(`Error al cerrar conexion Redis: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al cerrar conexion Redis: ${msg}`);
     }
   }
 

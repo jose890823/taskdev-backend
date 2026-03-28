@@ -1,5 +1,10 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -9,7 +14,10 @@ export class TaskStatus {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({ description: 'ID del proyecto (null = estado global para daily tasks)', required: false })
+  @ApiProperty({
+    description: 'ID del proyecto (null = estado global para daily tasks)',
+    required: false,
+  })
   @Column({ type: 'uuid', nullable: true })
   projectId: string | null;
 
@@ -29,11 +37,17 @@ export class TaskStatus {
   @Column({ type: 'int', default: 0 })
   position: number;
 
-  @ApiProperty({ example: false, description: 'Es el estado por defecto al crear tareas' })
+  @ApiProperty({
+    example: false,
+    description: 'Es el estado por defecto al crear tareas',
+  })
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
 
-  @ApiProperty({ example: false, description: 'Marca la tarea como completada' })
+  @ApiProperty({
+    example: false,
+    description: 'Marca la tarea como completada',
+  })
   @Column({ type: 'boolean', default: false })
   isCompleted: boolean;
 

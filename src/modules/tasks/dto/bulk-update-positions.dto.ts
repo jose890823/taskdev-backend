@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  IsArray, IsInt, IsOptional, IsUUID, Min, ValidateNested,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 
 export class BulkPositionItemDto {
@@ -14,14 +19,20 @@ export class BulkPositionItemDto {
   @Min(0)
   position: number;
 
-  @ApiProperty({ description: 'Nuevo statusId (si cambio de columna)', required: false })
+  @ApiProperty({
+    description: 'Nuevo statusId (si cambio de columna)',
+    required: false,
+  })
   @IsOptional()
   @IsUUID('4', { message: 'statusId debe ser un UUID valido' })
   statusId?: string;
 }
 
 export class BulkUpdatePositionsDto {
-  @ApiProperty({ type: [BulkPositionItemDto], description: 'Lista de tareas con nuevas posiciones' })
+  @ApiProperty({
+    type: [BulkPositionItemDto],
+    description: 'Lista de tareas con nuevas posiciones',
+  })
   @IsArray({ message: 'items debe ser un arreglo' })
   @ValidateNested({ each: true })
   @Type(() => BulkPositionItemDto)

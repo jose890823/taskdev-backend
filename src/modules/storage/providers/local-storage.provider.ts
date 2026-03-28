@@ -23,7 +23,11 @@ export class LocalStorageProvider implements IStorageProvider {
   readonly providerType = StorageProviderType.LOCAL;
 
   private basePath: string = './uploads';
-  private baseUrl: string = 'http://localhost:3001/uploads';
+  private baseUrl: string =
+    process.env.LOCAL_STORAGE_URL ||
+    (process.env.APP_URL
+      ? `${process.env.APP_URL}/uploads`
+      : 'http://localhost:3001/uploads');
   private initialized = false;
 
   /**
@@ -33,7 +37,12 @@ export class LocalStorageProvider implements IStorageProvider {
     const config = providerConfig.config as LocalConfig;
 
     this.basePath = config.basePath || './uploads';
-    this.baseUrl = config.baseUrl || 'http://localhost:3001/uploads';
+    this.baseUrl =
+      config.baseUrl ||
+      process.env.LOCAL_STORAGE_URL ||
+      (process.env.APP_URL
+        ? `${process.env.APP_URL}/uploads`
+        : 'http://localhost:3001/uploads');
 
     // Asegurar que el directorio base existe
     await this.ensureDirectory(this.basePath);
@@ -126,8 +135,8 @@ export class LocalStorageProvider implements IStorageProvider {
       await fs.promises.unlink(fullPath);
       this.logger.log(`File deleted: ${filePath}`);
       return true;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return false; // El archivo no existe
       }
       throw error;
@@ -168,6 +177,7 @@ export class LocalStorageProvider implements IStorageProvider {
   /**
    * Obtener la URL de un archivo
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- local URL generation is synchronous; async keeps interface contract
   async getUrl(filePath: string, options?: UrlOptions): Promise<string> {
     this.ensureInitialized();
 
@@ -302,8 +312,8 @@ export class LocalStorageProvider implements IStorageProvider {
         files,
         options?.recursive ?? false,
       );
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return [];
       }
       throw error;
@@ -368,8 +378,8 @@ export class LocalStorageProvider implements IStorageProvider {
   private async ensureDirectory(dirPath: string): Promise<void> {
     try {
       await fs.promises.mkdir(dirPath, { recursive: true });
-    } catch (error: any) {
-      if (error.code !== 'EEXIST') {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error;
       }
     }

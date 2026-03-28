@@ -1,6 +1,15 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index, BeforeInsert, ManyToOne, OneToMany, JoinColumn,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
+  BeforeInsert,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
@@ -43,15 +52,24 @@ export class Project {
   @Column({ type: 'uuid' })
   ownerId: string;
 
-  @ApiProperty({ description: 'ID de la organizacion (null = proyecto personal)', required: false })
+  @ApiProperty({
+    description: 'ID de la organizacion (null = proyecto personal)',
+    required: false,
+  })
   @Column({ type: 'uuid', nullable: true })
   organizationId: string | null;
 
-  @ApiProperty({ description: 'ID del proyecto padre (null = proyecto raiz)', required: false })
+  @ApiProperty({
+    description: 'ID del proyecto padre (null = proyecto raiz)',
+    required: false,
+  })
   @Column({ type: 'uuid', nullable: true })
   parentId: string | null;
 
-  @ManyToOne(() => Project, (p) => p.children, { onDelete: 'SET NULL', nullable: true })
+  @ManyToOne(() => Project, (p) => p.children, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
   @JoinColumn({ name: 'parentId' })
   parent: Project | null;
 

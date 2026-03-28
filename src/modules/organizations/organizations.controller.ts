@@ -1,9 +1,24 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
-import { CreateOrganizationDto, UpdateOrganizationDto, AddMemberDto } from './dto';
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  AddMemberDto,
+} from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 
@@ -33,7 +48,11 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Obtener organizacion por ID' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User) {
     const org = await this.organizationsService.findById(id);
-    await this.organizationsService.verifyMemberAccess(org.id, user.id, user.isSuperAdmin());
+    await this.organizationsService.verifyMemberAccess(
+      org.id,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return org;
   }
 
@@ -58,7 +77,11 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Listar miembros de la organizacion' })
   async getMembers(@Param('id') id: string, @CurrentUser() user: User) {
     const org = await this.organizationsService.findById(id);
-    await this.organizationsService.verifyMemberAccess(org.id, user.id, user.isSuperAdmin());
+    await this.organizationsService.verifyMemberAccess(
+      org.id,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.organizationsService.getMembers(id);
   }
 

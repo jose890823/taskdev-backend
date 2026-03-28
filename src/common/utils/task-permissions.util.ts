@@ -7,7 +7,10 @@ export function canCreateTask(role: ProjectRole | null): boolean {
   return role !== null && WRITE_ROLES.includes(role);
 }
 
-export function canEditTask(role: ProjectRole | null, isCreator: boolean): boolean {
+export function canEditTask(
+  role: ProjectRole | null,
+  isCreator: boolean,
+): boolean {
   if (role !== null && ADMIN_ROLES.includes(role)) return true;
   return isCreator && role !== null && WRITE_ROLES.includes(role);
 }

@@ -35,6 +35,7 @@ export class FileUploadService {
   /**
    * Upload profile photo
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- writeFileSync is synchronous; async keeps controller interface contract
   async uploadProfilePhoto(
     file: Express.Multer.File,
     userId: string,
@@ -57,8 +58,11 @@ export class FileUploadService {
       this.logger.log(`✅ Profile photo uploaded: ${filename}`);
 
       return publicUrl;
-    } catch (error) {
-      this.logger.error('Error uploading file', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error uploading file',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new BadRequestException('Failed to upload file');
     }
   }
@@ -66,6 +70,7 @@ export class FileUploadService {
   /**
    * Delete profile photo
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- unlinkSync is synchronous; async keeps controller interface contract
   async deleteProfilePhoto(photoUrl: string): Promise<void> {
     try {
       // Extract filename from URL
@@ -79,8 +84,11 @@ export class FileUploadService {
         unlinkSync(filepath);
         this.logger.log(`🗑️  Profile photo deleted: ${filename}`);
       }
-    } catch (error) {
-      this.logger.error('Error deleting file', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error deleting file',
+        error instanceof Error ? error.stack : String(error),
+      );
       // Don't throw error, just log it
     }
   }
@@ -124,9 +132,9 @@ export class FileUploadService {
    * TODO: Implement S3 upload
    * This method would upload to AWS S3 or similar cloud storage
    */
-  async uploadToS3(file: Express.Multer.File, userId: string): Promise<string> {
+  uploadToS3(_file: Express.Multer.File, _userId: string): Promise<string> {
     // Placeholder for S3 implementation
-    throw new Error('S3 upload not yet implemented');
+    return Promise.reject(new Error('S3 upload not yet implemented'));
 
     // Example implementation:
     // const s3 = new AWS.S3();

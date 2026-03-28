@@ -27,8 +27,11 @@ export class SmsService {
       this.twilioClient = new Twilio(accountSid, authToken);
       this.isConfigured = true;
       this.logger.log('📱 Twilio SMS Service inicializado correctamente');
-    } catch (error) {
-      this.logger.error('Error inicializando Twilio', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error inicializando Twilio',
+        error instanceof Error ? error.stack : String(error),
+      );
       this.isConfigured = false;
     }
   }
@@ -58,8 +61,11 @@ export class SmsService {
 
       this.logger.log(`✅ SMS enviado exitosamente a ${to}`);
       return true;
-    } catch (error) {
-      this.logger.error(`Error enviando SMS a ${to}`, error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error enviando SMS a ${to}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       return false;
     }
   }

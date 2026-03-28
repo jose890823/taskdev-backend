@@ -69,7 +69,7 @@ export class SecurityConfig {
   /**
    * Obtiene el valor parseado segun su tipo
    */
-  getParsedValue(): string | number | boolean | Record<string, any> {
+  getParsedValue(): string | number | boolean | Record<string, unknown> {
     switch (this.valueType) {
       case 'number':
         return parseFloat(this.value);
@@ -77,7 +77,7 @@ export class SecurityConfig {
         return this.value === 'true';
       case 'json':
         try {
-          return JSON.parse(this.value);
+          return JSON.parse(this.value) as Record<string, unknown>;
         } catch {
           return {};
         }

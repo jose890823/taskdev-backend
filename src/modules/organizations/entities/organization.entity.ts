@@ -1,6 +1,12 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index, BeforeInsert,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
+  BeforeInsert,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
@@ -13,7 +19,10 @@ export class Organization {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({ example: 'ORG-260218-X1Y2', description: 'Codigo del sistema' })
+  @ApiProperty({
+    example: 'ORG-260218-X1Y2',
+    description: 'Codigo del sistema',
+  })
   @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
   systemCode: string;
 
@@ -24,7 +33,10 @@ export class Organization {
     }
   }
 
-  @ApiProperty({ example: 'Acme Corp', description: 'Nombre de la organizacion' })
+  @ApiProperty({
+    example: 'Acme Corp',
+    description: 'Nombre de la organizacion',
+  })
   @Column({ type: 'varchar', length: 255 })
   name: string;
 
@@ -32,11 +44,19 @@ export class Organization {
   @Column({ type: 'varchar', length: 255, unique: true })
   slug: string;
 
-  @ApiProperty({ example: 'Empresa de tecnologia', description: 'Descripcion', required: false })
+  @ApiProperty({
+    example: 'Empresa de tecnologia',
+    description: 'Descripcion',
+    required: false,
+  })
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
-  @ApiProperty({ example: 'https://example.com/logo.png', description: 'URL del logo', required: false })
+  @ApiProperty({
+    example: 'https://example.com/logo.png',
+    description: 'URL del logo',
+    required: false,
+  })
   @Column({ type: 'text', nullable: true })
   logo: string | null;
 

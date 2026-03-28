@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, Max, IsString, IsEnum, IsUUID } from 'class-validator';
+import {
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsString,
+  IsEnum,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum SortOrder {
@@ -8,18 +16,29 @@ export enum SortOrder {
 }
 
 export class PaginationQueryDto {
-  @ApiPropertyOptional({ description: 'Filtrar por negocio (usado por super_admin)' })
+  @ApiPropertyOptional({
+    description: 'Filtrar por negocio (usado por super_admin)',
+  })
   @IsOptional()
   @IsUUID()
   businessId?: string;
-  @ApiPropertyOptional({ example: 1, description: 'Numero de pagina', minimum: 1 })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Numero de pagina',
+    minimum: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'La pagina debe ser un numero entero' })
   @Min(1, { message: 'La pagina minima es 1' })
   page?: number = 1;
 
-  @ApiPropertyOptional({ example: 20, description: 'Registros por pagina', minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Registros por pagina',
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'El limite debe ser un numero entero' })
@@ -37,7 +56,10 @@ export class PaginationQueryDto {
   @IsString()
   sortBy?: string;
 
-  @ApiPropertyOptional({ enum: SortOrder, description: 'Direccion del ordenamiento' })
+  @ApiPropertyOptional({
+    enum: SortOrder,
+    description: 'Direccion del ordenamiento',
+  })
   @IsOptional()
   @IsEnum(SortOrder, { message: 'sortOrder debe ser ASC o DESC' })
   sortOrder?: SortOrder = SortOrder.DESC;

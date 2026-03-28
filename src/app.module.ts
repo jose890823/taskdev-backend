@@ -1,4 +1,9 @@
-import { Module, Logger, Global } from '@nestjs/common';
+import {
+  Module,
+  Logger,
+  Global,
+  ClassSerializerInterceptor,
+} from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -37,6 +42,7 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { SearchModule } from './modules/search/search.module';
 
 // Importacion condicional de modulos opcionales
+
 let EmailModule: any = null;
 const emailModulePath = join(__dirname, 'modules/email/email.module');
 if (
@@ -44,8 +50,9 @@ if (
   existsSync(emailModulePath + '.js')
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- conditional require for optional module
     EmailModule = require('./modules/email/email.module').EmailModule;
-  } catch (error) {
+  } catch {
     // EmailModule no disponible
   }
 }
@@ -87,6 +94,7 @@ if (
     ActivityModule,
     SearchModule,
     // Modulos opcionales
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- spreading optional dynamic module
     ...(EmailModule ? [EmailModule] : []),
   ],
   controllers: [AppController],
@@ -97,6 +105,10 @@ if (
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
     },
     {
       provide: APP_FILTER,
@@ -125,7 +137,9 @@ export class AppModule {
       );
     }
 
-    AppModule.logger.log('Modulos TaskHub cargados: Organizations, Projects, Tasks, Comments, Activity');
+    AppModule.logger.log(
+      'Modulos TaskHub cargados: Organizations, Projects, Tasks, Comments, Activity',
+    );
     AppModule.logger.log('ModuleManagerService activado');
   }
 }

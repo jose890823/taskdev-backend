@@ -1,7 +1,19 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto, AddProjectMemberDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,14 +35,24 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Listar proyectos' })
   @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'personal', required: false, type: Boolean })
-  @ApiQuery({ name: 'includeChildren', required: false, type: Boolean, description: 'Incluir sub-proyectos en el listado (por defecto false)' })
+  @ApiQuery({
+    name: 'includeChildren',
+    required: false,
+    type: Boolean,
+    description: 'Incluir sub-proyectos en el listado (por defecto false)',
+  })
   async findAll(
     @CurrentUser() user: User,
     @Query('organizationId') organizationId?: string,
     @Query('personal') personal?: string,
     @Query('includeChildren') includeChildren?: string,
   ) {
-    return this.projectsService.findAll(user.id, organizationId, personal === 'true', includeChildren === 'true');
+    return this.projectsService.findAll(
+      user.id,
+      organizationId,
+      personal === 'true',
+      includeChildren === 'true',
+    );
   }
 
   @Get('by-slug/:slug')

@@ -34,6 +34,7 @@ export class CloudinaryStorageProvider implements IStorageProvider {
   /**
    * Inicializar el proveedor con su configuración
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async initialize(providerConfig: StorageProviderConfig): Promise<void> {
     const config = providerConfig.config as CloudinaryConfig;
 
@@ -143,7 +144,10 @@ export class CloudinaryStorageProvider implements IStorageProvider {
     }
 
     // Convertir web stream a Node.js Readable
-    return Readable.fromWeb(response.body as any);
+
+    return Readable.fromWeb(
+      response.body as Parameters<typeof Readable.fromWeb>[0],
+    );
   }
 
   /**
@@ -153,15 +157,17 @@ export class CloudinaryStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK uploader.destroy returns untyped result
       const result = await cloudinary.uploader.destroy(filePath, {
         resource_type: 'auto',
         invalidate: true,
       });
 
       this.logger.log(`File deleted from Cloudinary: ${filePath}`);
-      return result.result === 'ok';
-    } catch (error: any) {
-      if (error.http_code === 404) {
+
+      return (result as Record<string, unknown>).result === 'ok';
+    } catch (error: unknown) {
+      if ((error as Record<string, unknown>).http_code === 404) {
         return false;
       }
       throw error;
@@ -176,13 +182,16 @@ export class CloudinaryStorageProvider implements IStorageProvider {
 
     if (paths.length === 0) return 0;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK api.delete_resources returns untyped result
     const result = await cloudinary.api.delete_resources(paths, {
       resource_type: 'auto',
       invalidate: true,
     });
 
-    return Object.values(result.deleted || {}).filter((v) => v === 'deleted')
-      .length;
+    const deleted = (result as Record<string, unknown>).deleted;
+    return Object.values((deleted as Record<string, unknown>) || {}).filter(
+      (v) => v === 'deleted',
+    ).length;
   }
 
   /**
@@ -196,8 +205,8 @@ export class CloudinaryStorageProvider implements IStorageProvider {
         resource_type: 'auto',
       });
       return true;
-    } catch (error: any) {
-      if (error.http_code === 404) {
+    } catch (error: unknown) {
+      if ((error as Record<string, unknown>).http_code === 404) {
         return false;
       }
       throw error;
@@ -210,28 +219,29 @@ export class CloudinaryStorageProvider implements IStorageProvider {
   async getUrl(filePath: string, options?: UrlOptions): Promise<string> {
     this.ensureInitialized();
 
-    const urlOptions: any = {
-      secure: true,
-      resource_type: 'auto',
-    };
+    let flags: string | undefined;
 
     if (options?.forceDownload) {
-      urlOptions.flags = 'attachment';
-      if (options.downloadFilename) {
-        urlOptions.flags += `:${options.downloadFilename}`;
-      }
+      flags = options.downloadFilename
+        ? `attachment:${options.downloadFilename}`
+        : 'attachment';
     }
 
     if (options?.signed) {
       return this.getSignedUrl(filePath, options.expiresIn);
     }
 
-    return cloudinary.url(filePath, urlOptions);
+    return cloudinary.url(filePath, {
+      secure: true,
+      resource_type: 'auto',
+      ...(flags ? { flags } : {}),
+    });
   }
 
   /**
    * Obtener una URL firmada
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- cloudinary.url is synchronous; async keeps interface contract
   async getSignedUrl(filePath: string, expiresIn?: number): Promise<string> {
     this.ensureInitialized();
 
@@ -253,21 +263,23 @@ export class CloudinaryStorageProvider implements IStorageProvider {
   async getMetadata(filePath: string): Promise<FileMetadata> {
     this.ensureInitialized();
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK returns untyped resource objects
     const resource = await cloudinary.api.resource(filePath, {
       resource_type: 'auto',
     });
 
+    const r = resource as Record<string, unknown>;
     return {
-      path: resource.public_id,
-      size: resource.bytes,
-      mimeType: this.getMimeTypeFromFormat(resource.format),
-      lastModified: new Date(resource.created_at),
-      etag: resource.etag,
+      path: r.public_id as string,
+      size: r.bytes as number,
+      mimeType: this.getMimeTypeFromFormat(r.format as string),
+      lastModified: new Date(r.created_at as string),
+      etag: r.etag as string | undefined,
       metadata: {
-        format: resource.format,
-        width: resource.width?.toString(),
-        height: resource.height?.toString(),
-        resourceType: resource.resource_type,
+        format: r.format as string,
+        width: (r.width as number | undefined)?.toString() ?? '',
+        height: (r.height as number | undefined)?.toString() ?? '',
+        resourceType: r.resource_type as string,
       },
     };
   }
@@ -302,6 +314,7 @@ export class CloudinaryStorageProvider implements IStorageProvider {
   ): Promise<StorageResult> {
     this.ensureInitialized();
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK returns untyped rename result
     const result = await cloudinary.uploader.rename(
       sourcePath,
       destinationPath,
@@ -311,13 +324,14 @@ export class CloudinaryStorageProvider implements IStorageProvider {
       },
     );
 
+    const r = result as Record<string, unknown>;
     return {
-      path: result.public_id,
-      url: result.secure_url,
-      size: result.bytes,
-      mimeType: this.getMimeTypeFromFormat(result.format),
+      path: r.public_id as string,
+      url: r.secure_url as string,
+      size: r.bytes as number,
+      mimeType: this.getMimeTypeFromFormat(r.format as string),
       provider: this.providerType,
-      etag: result.etag,
+      etag: r.etag as string | undefined,
     };
   }
 
@@ -336,6 +350,7 @@ export class CloudinaryStorageProvider implements IStorageProvider {
     let nextCursor: string | undefined;
 
     do {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK returns untyped resources list
       const result = await cloudinary.api.resources({
         type: 'upload',
         prefix: prefix || undefined,
@@ -345,16 +360,18 @@ export class CloudinaryStorageProvider implements IStorageProvider {
         next_cursor: nextCursor,
       });
 
-      for (const resource of result.resources) {
+      const r = result as Record<string, unknown>;
+      const resources = (r.resources as Record<string, unknown>[]) ?? [];
+      for (const resource of resources) {
         files.push({
-          path: resource.public_id,
-          size: resource.bytes,
-          mimeType: this.getMimeTypeFromFormat(resource.format),
-          lastModified: new Date(resource.created_at),
+          path: resource.public_id as string,
+          size: resource.bytes as number,
+          mimeType: this.getMimeTypeFromFormat(resource.format as string),
+          lastModified: new Date(resource.created_at as string),
         });
       }
 
-      nextCursor = result.next_cursor;
+      nextCursor = r.next_cursor as string | undefined;
 
       if (options?.limit && files.length >= options.limit) {
         break;
@@ -390,14 +407,18 @@ export class CloudinaryStorageProvider implements IStorageProvider {
   }> {
     this.ensureInitialized();
 
-    const usage = await cloudinary.api.usage();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- cloudinary SDK returns untyped usage object
+    const usageRaw = await cloudinary.api.usage();
+    const usage = usageRaw as Record<string, unknown>;
+    const storage = usage.storage as Record<string, number> | undefined;
 
     return {
-      used: usage.storage?.usage || 0,
-      total: usage.storage?.limit,
-      available: usage.storage?.limit
-        ? usage.storage.limit - usage.storage.usage
-        : undefined,
+      used: storage?.usage ?? 0,
+      total: storage?.limit,
+      available:
+        storage?.limit != null
+          ? storage.limit - (storage.usage ?? 0)
+          : undefined,
     };
   }
 
@@ -457,13 +478,14 @@ export class CloudinaryStorageProvider implements IStorageProvider {
     buffer: Buffer,
     options: UploadApiOptions,
   ): Promise<UploadApiResponse> {
-    return new Promise((resolve, reject) => {
+    return new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         options,
         (error, result) => {
-          if (error) reject(error);
+          if (error)
+            reject(new Error(error.message ?? 'Cloudinary upload error'));
           else if (result) resolve(result);
-          else reject(new Error('Upload failed'));
+          else reject(new Error('Upload failed: no result returned'));
         },
       );
 
@@ -478,13 +500,14 @@ export class CloudinaryStorageProvider implements IStorageProvider {
     stream: Readable,
     options: UploadApiOptions,
   ): Promise<UploadApiResponse> {
-    return new Promise((resolve, reject) => {
+    return new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         options,
         (error, result) => {
-          if (error) reject(error);
+          if (error)
+            reject(new Error(error.message ?? 'Cloudinary upload error'));
           else if (result) resolve(result);
-          else reject(new Error('Upload failed'));
+          else reject(new Error('Upload failed: no result returned'));
         },
       );
 

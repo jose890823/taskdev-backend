@@ -85,7 +85,12 @@ export class StorageConfigService implements OnModuleInit {
    * Obtener configuración por defecto para un proveedor
    */
   private getDefaultConfig(provider: StorageProviderType): {
-    config: any;
+    config:
+      | S3Config
+      | GCSConfig
+      | CloudinaryConfig
+      | LocalConfig
+      | Record<string, never>;
     settings: StorageSettings;
   } {
     const defaultSettings: StorageSettings = {
@@ -268,10 +273,17 @@ export class StorageConfigService implements OnModuleInit {
     if (update.config) {
       // Encriptar campos sensibles antes de guardar
       const encryptedConfig = this.encryptSensitiveFields(
-        { ...config.config, ...update.config },
+        {
+          ...(config.config as unknown as Record<string, unknown>),
+          ...(update.config as Record<string, unknown>),
+        },
         provider,
       );
-      config.config = encryptedConfig as any;
+      config.config = encryptedConfig as unknown as
+        | S3Config
+        | GCSConfig
+        | CloudinaryConfig
+        | LocalConfig;
     }
 
     if (update.settings) {
@@ -348,7 +360,7 @@ export class StorageConfigService implements OnModuleInit {
 
     // Desencriptar campos sensibles
     const decryptedConfig = this.decryptSensitiveFields(
-      config.config,
+      config.config as unknown as Record<string, unknown>,
       provider,
     );
 
@@ -364,26 +376,27 @@ export class StorageConfigService implements OnModuleInit {
    * Encriptar campos sensibles
    */
   private encryptSensitiveFields(
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     provider: StorageProviderType,
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     const result = { ...config };
     const sensitiveFields = this.getSensitiveFields(provider);
 
     for (const field of sensitiveFields) {
-      if (
-        result[field] &&
-        typeof result[field] === 'string' &&
-        result[field] !== '********'
-      ) {
-        result[field] = this.encryptionService.encrypt(result[field]);
+      const value: unknown = result[field];
+      if (value && typeof value === 'string' && value !== '********') {
+        result[field] = this.encryptionService.encrypt(value);
       }
     }
 
     // Manejar credenciales anidadas de GCS
     if (result.credentials && typeof result.credentials === 'object') {
-      const creds = result.credentials as Record<string, any>;
-      if (creds.private_key && creds.private_key !== '********') {
+      const creds = result.credentials as Record<string, unknown>;
+      if (
+        creds.private_key &&
+        typeof creds.private_key === 'string' &&
+        creds.private_key !== '********'
+      ) {
         creds.private_key = this.encryptionService.encrypt(creds.private_key);
       }
     }
@@ -395,16 +408,17 @@ export class StorageConfigService implements OnModuleInit {
    * Desencriptar campos sensibles
    */
   private decryptSensitiveFields(
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     provider: StorageProviderType,
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     const result = { ...config };
     const sensitiveFields = this.getSensitiveFields(provider);
 
     for (const field of sensitiveFields) {
-      if (result[field] && typeof result[field] === 'string') {
+      const value: unknown = result[field];
+      if (value && typeof value === 'string') {
         try {
-          result[field] = this.encryptionService.decrypt(result[field]);
+          result[field] = this.encryptionService.decrypt(value);
         } catch {
           // Si no se puede desencriptar, dejar como está (puede ser texto plano)
         }
@@ -413,8 +427,8 @@ export class StorageConfigService implements OnModuleInit {
 
     // Manejar credenciales anidadas de GCS
     if (result.credentials && typeof result.credentials === 'object') {
-      const creds = result.credentials as Record<string, any>;
-      if (creds.private_key) {
+      const creds = result.credentials as Record<string, unknown>;
+      if (creds.private_key && typeof creds.private_key === 'string') {
         try {
           creds.private_key = this.encryptionService.decrypt(creds.private_key);
         } catch {

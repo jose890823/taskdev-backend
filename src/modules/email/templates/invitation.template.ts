@@ -7,9 +7,13 @@ interface InvitationTemplateData {
   projectName?: string;
 }
 
-export function getInvitationEmailTemplate(data: InvitationTemplateData): string {
+export function getInvitationEmailTemplate(
+  data: InvitationTemplateData,
+): string {
   const brandName = data.brandName || 'TaskHub';
-  const invitedBy = data.invitedByName ? ` por <strong style="color: #e2e8f0;">${data.invitedByName}</strong>` : '';
+  const invitedBy = data.invitedByName
+    ? ` por <strong style="color: #e2e8f0;">${data.invitedByName}</strong>`
+    : '';
 
   const roleLabels: Record<string, string> = {
     owner: 'Propietario',

@@ -11,6 +11,30 @@ import {
   NotificationStatus,
 } from '../entities/notification.entity';
 import { User } from '../../auth/entities/user.entity';
+import type { CreateNotificationDto } from '../dto/create-notification.dto';
+
+/** Minimal interface for the optionally-injected EmailService */
+interface INotificationEmailService {
+  sendNotificationEmail(params: {
+    to: string;
+    subject: string;
+    content: string;
+    actionUrl?: string;
+    actionText?: string;
+    userName?: string;
+  }): Promise<void>;
+  sendDigestEmail(params: {
+    to: string;
+    userName?: string;
+    notifications: Array<{
+      title: string;
+      message: string;
+      createdAt: Date;
+      actionUrl?: string | null;
+    }>;
+    frequency: 'daily' | 'weekly';
+  }): Promise<void>;
+}
 
 /**
  * Procesador de cola de notificaciones
@@ -26,7 +50,9 @@ export class NotificationProcessor {
     private readonly userRepository: Repository<User>,
     @InjectQueue('notifications')
     private readonly notificationQueue: Queue,
-    @Optional() @Inject('EmailService') private readonly emailService?: any,
+    @Optional()
+    @Inject('EmailService')
+    private readonly emailService?: INotificationEmailService,
   ) {}
 
   /**
@@ -93,11 +119,15 @@ export class NotificationProcessor {
           notification.status = NotificationStatus.SENT;
           notification.sentAt = new Date();
           this.logger.log(`Email enviado a ${user.email}`);
-        } catch (emailError) {
+        } catch (emailError: unknown) {
+          const emailMsg =
+            emailError instanceof Error
+              ? emailError.message
+              : String(emailError);
           notification.status = NotificationStatus.FAILED;
-          notification.failureReason = emailError.message;
+          notification.failureReason = emailMsg;
           notification.retryCount += 1;
-          this.logger.error(`Error enviando email: ${emailError.message}`);
+          this.logger.error(`Error enviando email: ${emailMsg}`);
         }
       } else {
         // Si no hay servicio de email, marcar como enviado (simulado)
@@ -109,8 +139,9 @@ export class NotificationProcessor {
       }
 
       await this.notificationRepository.save(notification);
-    } catch (error) {
-      this.logger.error(`Error procesando email: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error procesando email: ${msg}`);
       throw error;
     }
   }
@@ -170,11 +201,10 @@ export class NotificationProcessor {
             actionText: data.actionText,
           });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         failed++;
-        this.logger.error(
-          `Error en broadcast para usuario ${userId}: ${error.message}`,
-        );
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Error en broadcast para usuario ${userId}: ${msg}`);
       }
     }
 
@@ -190,7 +220,7 @@ export class NotificationProcessor {
   async handleAddToDigest(
     job: Job<{
       userId: string;
-      notification: any;
+      notification: Omit<CreateNotificationDto, 'userId'>;
     }>,
   ): Promise<void> {
     const { data } = job;
@@ -208,10 +238,10 @@ export class NotificationProcessor {
       status: NotificationStatus.PENDING,
       title: data.notification.title,
       message: data.notification.message,
-      actionUrl: data.notification.actionUrl || null,
-      actionText: data.notification.actionText || null,
-      referenceId: data.notification.referenceId || null,
-      referenceType: data.notification.referenceType || null,
+      actionUrl: data.notification.actionUrl ?? null,
+      actionText: data.notification.actionText ?? null,
+      referenceId: data.notification.referenceId ?? null,
+      referenceType: data.notification.referenceType ?? null,
       metadata: {
         ...data.notification.metadata,
         isDigest: true,
@@ -285,8 +315,9 @@ export class NotificationProcessor {
         this.logger.log(
           `Digest enviado a ${user.email} con ${pendingNotifications.length} notificaciones`,
         );
-      } catch (error) {
-        this.logger.error(`Error enviando digest: ${error.message}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Error enviando digest: ${msg}`);
       }
     }
   }

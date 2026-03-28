@@ -13,6 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomInt, randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -32,13 +33,23 @@ import { LoginAttemptService } from '../security/services/login-attempt.service'
 import { ActiveSessionService } from '../security/services/active-session.service';
 import { LoginFailureReason } from '../security/entities/login-attempt.entity';
 
-// Importación opcional del EmailService
-let EmailService: any;
-try {
-  EmailService = require('../email/email.service').EmailService;
-} catch (error) {
-  // Módulo de email no existe - el sistema seguirá funcionando
-  EmailService = null;
+/**
+ * Interfaz mínima que expone el EmailService opcional para AuthService.
+ * El módulo de email es opcional — puede no existir en todos los entornos.
+ */
+interface IEmailService {
+  isAvailable(): boolean;
+  sendOtpEmail(opts: {
+    to: string;
+    firstName?: string;
+    otpCode: string;
+    expirationMinutes: number;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }>;
+  sendPasswordResetEmail(opts: {
+    to: string;
+    firstName?: string;
+    resetUrl: string;
+  }): Promise<void>;
 }
 
 @Injectable()
@@ -53,13 +64,13 @@ export class AuthService {
     private userActivityService: UserActivityService,
     private loginAttemptService: LoginAttemptService,
     private activeSessionService: ActiveSessionService,
-    @Optional() @Inject('EmailService') private emailService?: any,
+    @Optional() @Inject('EmailService') private emailService?: IEmailService,
   ) {
     if (this.emailService) {
       this.logger.log('✅ EmailService disponible en AuthService');
     } else {
       this.logger.warn(
-        '⚠️  EmailService no disponible - OTPs se mostrarán solo en logs',
+        '⚠️  EmailService no disponible — OTPs solo se entregarán en modo desarrollo',
       );
     }
     this.logger.log(
@@ -140,22 +151,30 @@ export class AuthService {
             `⚠️ OTP no enviado a ${email}: ${emailResult.error}`,
           );
         }
-      } catch (error) {
-        this.logger.error(
-          `❌ Error enviando OTP por email a ${email}: ${error.message}`,
-        );
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`❌ Error enviando OTP por email a ${email}: ${msg}`);
         // No lanzamos error, el sistema sigue funcionando
       }
     } else {
-      // Si no hay EmailService, mostrar OTP en logs (modo desarrollo)
-      this.logger.log(`📧 OTP generado para ${email}: ${otpCode}`);
-      this.logger.warn(
-        '⚠️  Email no enviado - EmailService no disponible o no configurado',
-      );
+      // Sin EmailService — en dev mostrar OTP en logs, en prod NUNCA
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.warn(
+          `[DEV] OTP generado para ${email}: ${otpCode} — EmailService no disponible`,
+        );
+      } else {
+        this.logger.error(
+          `❌ EmailService no disponible en producción — OTP para ${email} NO puede ser entregado. Configure el servicio de email.`,
+        );
+      }
     }
 
     // Retornar usuario sin información sensible
-    const { password: _, otpCode: __, ...userWithoutSensitive } = user;
+    const {
+      password: _password,
+      otpCode: _otpCode,
+      ...userWithoutSensitive
+    } = user;
 
     return {
       user: userWithoutSensitive,
@@ -279,14 +298,22 @@ export class AuthService {
             `⚠️ OTP no reenviado a ${email}: ${emailResult.error}`,
           );
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(
-          `❌ Error reenviando OTP por email a ${email}: ${error.message}`,
+          `❌ Error reenviando OTP por email a ${email}: ${msg}`,
         );
       }
     } else {
-      this.logger.log(`📧 Nuevo OTP generado para ${email}: ${otpCode}`);
-      this.logger.warn('⚠️  Email no enviado - EmailService no disponible');
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.warn(
+          `[DEV] Nuevo OTP generado para ${email}: ${otpCode} — EmailService no disponible`,
+        );
+      } else {
+        this.logger.error(
+          `❌ EmailService no disponible en producción — OTP de reenvío para ${email} NO puede ser entregado.`,
+        );
+      }
     }
 
     return {
@@ -431,10 +458,10 @@ export class AuthService {
 
     // Retornar tokens y usuario sin información sensible
     const {
-      password: _,
-      refreshToken: __,
-      otpCode,
-      resetPasswordToken,
+      password: _password2,
+      refreshToken: _refreshToken,
+      otpCode: _otpCode2,
+      resetPasswordToken: _resetPasswordToken,
       ...userWithoutSensitive
     } = user;
 
@@ -657,16 +684,22 @@ export class AuthService {
           resetUrl,
         });
         this.logger.log(`📧 Email de reset password enviado a ${email}`);
-      } catch (error) {
-        this.logger.error(
-          `Error enviando email de reset password: ${error.message}`,
-        );
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Error enviando email de reset password: ${msg}`);
         // No lanzamos error, el sistema sigue funcionando
       }
     } else {
-      this.logger.log(`🔑 Reset token generado para ${email}: ${resetToken}`);
-      this.logger.log(`🔗 Reset URL: ${resetUrl}`);
-      this.logger.warn('⚠️  Email no enviado - EmailService no disponible');
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.warn(
+          `[DEV] Reset token generado para ${email}: ${resetToken}`,
+        );
+        this.logger.warn(`[DEV] Reset URL: ${resetUrl}`);
+      } else {
+        this.logger.error(
+          `❌ EmailService no disponible en producción — Reset password para ${email} NO puede ser entregado.`,
+        );
+      }
     }
 
     return {
@@ -815,15 +848,22 @@ export class AuthService {
         this.logger.log(
           `📧 OTP para cambio de contraseña enviado a ${user.email}`,
         );
-      } catch (error) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(
-          `Error enviando OTP para cambio de contraseña: ${error.message}`,
+          `Error enviando OTP para cambio de contraseña: ${msg}`,
         );
       }
     } else {
-      this.logger.log(
-        `📧 OTP para cambio de contraseña generado para ${user.email}: ${otpCode}`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.warn(
+          `[DEV] OTP cambio de contraseña para ${user.email}: ${otpCode} — EmailService no disponible`,
+        );
+      } else {
+        this.logger.error(
+          `❌ EmailService no disponible en producción — OTP cambio de contraseña para ${user.email} NO puede ser entregado.`,
+        );
+      }
     }
 
     return {
@@ -927,10 +967,10 @@ export class AuthService {
 
     // Retornar usuario sin información sensible
     const {
-      password,
-      refreshToken,
-      otpCode,
-      resetPasswordToken,
+      password: _password3,
+      refreshToken: _refreshToken2,
+      otpCode: _otpCode3,
+      resetPasswordToken: _resetPasswordToken2,
       ...userWithoutSensitive
     } = user;
 
@@ -941,7 +981,7 @@ export class AuthService {
    * MCP SCOPES: Retorna los scopes permitidos para el usuario
    * Preparado para filtrado por plan de suscripción en el futuro
    */
-  async getMcpScopes(user: User): Promise<{ scopes: string[] }> {
+  getMcpScopes(_user: User): { scopes: string[] } {
     const allScopes = [
       'tasks:read',
       'tasks:write',
@@ -984,17 +1024,13 @@ export class AuthService {
   }
 
   /**
-   * Generar código OTP aleatorio de 6 dígitos
+   * Generar código OTP aleatorio de 6 dígitos (CSPRNG)
    */
   private generateOtp(): string {
-    const otpLength = parseInt(
-      this.configService.get<string>('OTP_LENGTH', '6'),
-      10,
-    );
-    return Math.floor(
-      Math.pow(10, otpLength - 1) +
-        Math.random() * 9 * Math.pow(10, otpLength - 1),
-    ).toString();
+    const otpLength = parseInt(this.configService.get('OTP_LENGTH', '6'), 10);
+    const min = Math.pow(10, otpLength - 1);
+    const max = Math.pow(10, otpLength) - 1;
+    return randomInt(min, max + 1).toString();
   }
 
   /**
@@ -1021,8 +1057,15 @@ export class AuthService {
       roles: user.roles, // Nuevo: array de roles
     };
 
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error(
+        'JWT_SECRET no esta configurado. Configura la variable de entorno JWT_SECRET.',
+      );
+    }
+
     return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_SECRET') || 'default-secret',
+      secret,
       expiresIn: this.configService.get('JWT_EXPIRATION') || '15m',
     });
   }
@@ -1036,10 +1079,15 @@ export class AuthService {
       email: user.email,
     };
 
+    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    if (!refreshSecret) {
+      throw new Error(
+        'JWT_REFRESH_SECRET no esta configurado. Configura la variable de entorno JWT_REFRESH_SECRET.',
+      );
+    }
+
     return this.jwtService.signAsync(payload, {
-      secret:
-        this.configService.get<string>('JWT_REFRESH_SECRET') ||
-        'default-refresh-secret',
+      secret: refreshSecret,
       expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION') || '7d',
     });
   }
@@ -1055,15 +1103,9 @@ export class AuthService {
   }
 
   /**
-   * Generar token de reseteo de contraseña
+   * Generar token de reseteo de contraseña (CSPRNG)
    */
   private generateResetToken(): string {
-    // Generar token aleatorio seguro
-    const randomBytes = Array.from({ length: 32 }, () =>
-      Math.floor(Math.random() * 256)
-        .toString(16)
-        .padStart(2, '0'),
-    ).join('');
-    return randomBytes;
+    return randomBytes(32).toString('hex');
   }
 }

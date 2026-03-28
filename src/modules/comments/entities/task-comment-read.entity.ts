@@ -1,5 +1,9 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, UpdateDateColumn, Index,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('task_comment_reads')

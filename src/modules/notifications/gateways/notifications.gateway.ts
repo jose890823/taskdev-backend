@@ -10,10 +10,21 @@ import { Server, Socket } from 'socket.io';
 import * as jwt from 'jsonwebtoken';
 import { Notification } from '../entities/notification.entity';
 
+/** Extends Socket to carry our custom userId property */
+interface AuthenticatedSocket extends Socket {
+  userId?: string;
+}
+
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
-    origin: '*',
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? (process.env.CORS_ORIGIN || '')
+            .split(',')
+            .map((o) => o.trim())
+            .filter(Boolean)
+        : true,
     credentials: true,
   },
 })
@@ -33,11 +44,14 @@ export class NotificationsGateway
   /**
    * Al conectar: verificar JWT, unir a room personal
    */
-  async handleConnection(client: Socket): Promise<void> {
+  async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
       const token =
         (client.handshake.auth?.token as string) ||
-        (client.handshake.headers?.authorization?.replace('Bearer ', '') as string);
+        (client.handshake.headers?.authorization?.replace(
+          'Bearer ',
+          '',
+        ) as string);
 
       if (!token) {
         this.logger.warn(`Socket ${client.id}: sin token`);
@@ -54,8 +68,8 @@ export class NotificationsGateway
         return;
       }
 
-      // Guardar userId en el socket
-      (client as any).userId = userId;
+      // Guardar userId en el socket para recuperarlo en handleDisconnect
+      client.userId = userId;
 
       // Unir a room personal
       await client.join(`user:${userId}`);
@@ -67,7 +81,7 @@ export class NotificationsGateway
       this.connectedUsers.get(userId)!.add(client.id);
 
       this.logger.log(`Socket conectado: ${client.id} (user: ${userId})`);
-    } catch (err) {
+    } catch (_err) {
       this.logger.warn(`Socket ${client.id}: token invalido`);
       client.disconnect();
     }
@@ -76,8 +90,8 @@ export class NotificationsGateway
   /**
    * Al desconectar: limpiar tracking
    */
-  handleDisconnect(client: Socket): void {
-    const userId = (client as any).userId as string | undefined;
+  handleDisconnect(client: AuthenticatedSocket): void {
+    const userId = client.userId;
     if (userId) {
       const sockets = this.connectedUsers.get(userId);
       if (sockets) {

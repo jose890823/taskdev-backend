@@ -13,12 +13,15 @@ export class MigrateAssignedToTaskAssignees1739900000000 implements MigrationInt
     const hasTable = await queryRunner.hasTable('task_assignees');
 
     if (!hasTable) {
-      console.log('⚠️ Tabla task_assignees no existe. Reinicia el backend con synchronize:true primero.');
+      console.log(
+        '⚠️ Tabla task_assignees no existe. Reinicia el backend con synchronize:true primero.',
+      );
       return;
     }
 
     // Insert assignees from legacy field where not already in task_assignees
-    const result = await queryRunner.query(`
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- TypeORM queryRunner.query returns any
+    const result: { rowCount?: number } = await queryRunner.query(`
       INSERT INTO "task_assignees" ("id", "taskId", "userId", "createdAt")
       SELECT
         gen_random_uuid(),
@@ -34,12 +37,17 @@ export class MigrateAssignedToTaskAssignees1739900000000 implements MigrationInt
         )
     `);
 
-    const count = Array.isArray(result) ? result.length : (result?.rowCount || 0);
-    console.log(`✅ Migración completada: ${count} asignaciones copiadas a task_assignees`);
+    const count = Array.isArray(result)
+      ? result.length
+      : (result?.rowCount ?? 0);
+    console.log(
+      `✅ Migración completada: ${count} asignaciones copiadas a task_assignees`,
+    );
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public down(_queryRunner: QueryRunner): Promise<void> {
     // No-op: no eliminamos datos de task_assignees ya que pueden haber sido modificados
     console.log('ℹ️ Rollback no aplica para esta migración');
+    return Promise.resolve();
   }
 }

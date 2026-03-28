@@ -7,7 +7,10 @@ export class CreateCommentDto {
   @IsUUID('4')
   taskId: string;
 
-  @ApiProperty({ example: 'Excelente avance', description: 'Contenido del comentario' })
+  @ApiProperty({
+    example: 'Excelente avance',
+    description: 'Contenido del comentario',
+  })
   @IsNotEmpty({ message: 'El contenido es obligatorio' })
   @IsString()
   content: string;

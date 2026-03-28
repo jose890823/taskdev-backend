@@ -59,7 +59,7 @@ export class FeatureFlagGuard implements CanActivate {
       }
 
       // Obtener storeId del usuario (si existe en el request o en el usuario)
-      if (user.storeId) {
+      if (typeof user.storeId === 'string') {
         featureContext.storeId = user.storeId;
       } else if (request.params?.storeId) {
         featureContext.storeId = request.params.storeId;

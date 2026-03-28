@@ -1,11 +1,22 @@
 import {
-  Injectable, Logger, NotFoundException, ConflictException, ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Organization } from './entities/organization.entity';
-import { OrganizationMember, OrganizationRole } from './entities/organization-member.entity';
-import { CreateOrganizationDto, UpdateOrganizationDto, AddMemberDto } from './dto';
+import {
+  OrganizationMember,
+  OrganizationRole,
+} from './entities/organization-member.entity';
+import {
+  CreateOrganizationDto,
+  UpdateOrganizationDto,
+  AddMemberDto,
+} from './dto';
 import { User } from '../auth/entities/user.entity';
 import { isUuid } from '../../common/utils/identifier.util';
 
@@ -18,6 +29,7 @@ export class OrganizationsService {
     private readonly orgRepository: Repository<Organization>,
     @InjectRepository(OrganizationMember)
     private readonly memberRepository: Repository<OrganizationMember>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(dto: CreateOrganizationDto, user: User): Promise<Organization> {
@@ -28,22 +40,24 @@ export class OrganizationsService {
       throw new ConflictException('Ya existe una organizacion con ese nombre');
     }
 
-    const org = this.orgRepository.create({
-      ...dto,
-      slug,
-      ownerId: user.id,
-    });
-    await this.orgRepository.save(org);
+    return this.dataSource.transaction(async (manager) => {
+      const org = manager.create(Organization, {
+        ...dto,
+        slug,
+        ownerId: user.id,
+      });
+      await manager.save(org);
 
-    const member = this.memberRepository.create({
-      organizationId: org.id,
-      userId: user.id,
-      role: OrganizationRole.OWNER,
-    });
-    await this.memberRepository.save(member);
+      const member = manager.create(OrganizationMember, {
+        organizationId: org.id,
+        userId: user.id,
+        role: OrganizationRole.OWNER,
+      });
+      await manager.save(member);
 
-    this.logger.log(`Organizacion creada: ${org.name} por ${user.email}`);
-    return org;
+      this.logger.log(`Organizacion creada: ${org.name} por ${user.email}`);
+      return org;
+    });
   }
 
   async findAll(userId: string): Promise<Organization[]> {
@@ -64,13 +78,19 @@ export class OrganizationsService {
   }
 
   async findById(identifier: string): Promise<Organization> {
-    const where = isUuid(identifier) ? { id: identifier } : { systemCode: identifier };
+    const where = isUuid(identifier)
+      ? { id: identifier }
+      : { systemCode: identifier };
     const org = await this.orgRepository.findOne({ where });
     if (!org) throw new NotFoundException('Organizacion no encontrada');
     return org;
   }
 
-  async update(identifier: string, dto: UpdateOrganizationDto, userId: string): Promise<Organization> {
+  async update(
+    identifier: string,
+    dto: UpdateOrganizationDto,
+    userId: string,
+  ): Promise<Organization> {
     const org = await this.findById(identifier);
     await this.verifyAdminAccess(org.id, userId);
 
@@ -78,9 +98,11 @@ export class OrganizationsService {
       const slug = this.generateSlug(dto.name);
       const existing = await this.orgRepository.findOne({ where: { slug } });
       if (existing && existing.id !== org.id) {
-        throw new ConflictException('Ya existe una organizacion con ese nombre');
+        throw new ConflictException(
+          'Ya existe una organizacion con ese nombre',
+        );
       }
-      (org as any).slug = slug;
+      org.slug = slug;
     }
 
     Object.assign(org, dto);
@@ -90,7 +112,9 @@ export class OrganizationsService {
   async remove(identifier: string, userId: string): Promise<void> {
     const org = await this.findById(identifier);
     if (org.ownerId !== userId) {
-      throw new ForbiddenException('Solo el dueno puede eliminar la organizacion');
+      throw new ForbiddenException(
+        'Solo el dueno puede eliminar la organizacion',
+      );
     }
     await this.orgRepository.softDelete(org.id);
   }
@@ -104,14 +128,21 @@ export class OrganizationsService {
     });
   }
 
-  async getMemberRole(organizationId: string, userId: string): Promise<string | null> {
+  async getMemberRole(
+    organizationId: string,
+    userId: string,
+  ): Promise<string | null> {
     const member = await this.memberRepository.findOne({
       where: { organizationId, userId },
     });
     return member?.role || null;
   }
 
-  async addMember(identifier: string, dto: AddMemberDto, requestUserId: string): Promise<OrganizationMember> {
+  async addMember(
+    identifier: string,
+    dto: AddMemberDto,
+    requestUserId: string,
+  ): Promise<OrganizationMember> {
     const org = await this.findById(identifier);
     await this.verifyAdminAccess(org.id, requestUserId);
 
@@ -128,7 +159,11 @@ export class OrganizationsService {
     return this.memberRepository.save(member);
   }
 
-  async removeMember(identifier: string, userId: string, requestUserId: string): Promise<void> {
+  async removeMember(
+    identifier: string,
+    userId: string,
+    requestUserId: string,
+  ): Promise<void> {
     const org = await this.findById(identifier);
     await this.verifyAdminAccess(org.id, requestUserId);
     const member = await this.memberRepository.findOne({
@@ -148,7 +183,11 @@ export class OrganizationsService {
     return !!member;
   }
 
-  async verifyMemberAccess(organizationId: string, userId: string, isSuperAdmin = false): Promise<void> {
+  async verifyMemberAccess(
+    organizationId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
     if (isSuperAdmin) return;
     const member = await this.memberRepository.findOne({
       where: { organizationId, userId },
@@ -158,12 +197,21 @@ export class OrganizationsService {
     }
   }
 
-  private async verifyAdminAccess(organizationId: string, userId: string): Promise<void> {
+  private async verifyAdminAccess(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
     const member = await this.memberRepository.findOne({
       where: { organizationId, userId },
     });
-    if (!member || (member.role !== OrganizationRole.OWNER && member.role !== OrganizationRole.ADMIN)) {
-      throw new ForbiddenException('No tienes permisos de administrador en esta organizacion');
+    if (
+      !member ||
+      (member.role !== OrganizationRole.OWNER &&
+        member.role !== OrganizationRole.ADMIN)
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos de administrador en esta organizacion',
+      );
     }
   }
 

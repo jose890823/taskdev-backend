@@ -25,13 +25,17 @@ const SUPPORTED_LOCALES: string[] = Object.values(TranslationLocale);
  */
 @Injectable()
 export class LocaleInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<{
+      query?: { lang?: string };
+      headers: { 'accept-language'?: string };
+      locale?: string;
+    }>();
 
     // Prioridad: 1) query param ?lang=en  2) Accept-Language header  3) default 'es'
     const lang =
-      request.query?.lang ||
-      request.headers['accept-language']?.split(',')[0]?.split('-')[0] ||
+      request.query?.lang ??
+      request.headers['accept-language']?.split(',')[0]?.split('-')[0] ??
       'es';
 
     request.locale = SUPPORTED_LOCALES.includes(lang) ? lang : 'es';

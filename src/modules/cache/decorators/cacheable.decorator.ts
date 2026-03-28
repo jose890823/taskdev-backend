@@ -48,7 +48,7 @@ export interface CacheableOptions {
  */
 export const Cacheable = (options: CacheableOptions): MethodDecorator => {
   return (
-    target: any,
+    target: object,
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor,
   ) => {

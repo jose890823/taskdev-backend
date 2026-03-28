@@ -49,19 +49,7 @@ export class IpBlockGuard implements CanActivate {
   }
 
   private getClientIp(request: Request): string {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor)
-        ? forwardedFor[0]
-        : forwardedFor.split(',')[0];
-      return ips.trim();
-    }
-
-    const realIp = request.headers['x-real-ip'];
-    if (realIp) {
-      return Array.isArray(realIp) ? realIp[0] : realIp;
-    }
-
-    return request.ip || request.socket.remoteAddress || 'unknown';
+    // Confiamos en req.ip que respeta trust proxy configurado en main.ts
+    return request.ip || request.socket?.remoteAddress || 'unknown';
   }
 }

@@ -75,9 +75,9 @@ export class WebhooksService {
       });
 
       return await this.webhookEventRepository.save(event);
-    } catch (error) {
+    } catch (error: unknown) {
       // Manejar violacion de constraint unico (duplicado concurrente)
-      if (error.code === '23505') {
+      if ((error as { code?: string }).code === '23505') {
         this.logger.warn(
           `Webhook duplicado concurrente detectado: ${source}/${externalEventId}`,
         );
@@ -321,7 +321,8 @@ export class WebhooksService {
     last24h: { received: number; processed: number; failed: number };
   }> {
     // Conteos por estado
-    const statusCounts = await this.webhookEventRepository
+    // TypeORM getRawMany() returns any[]; we type each row explicitly in the loop
+    const statusCounts: unknown[] = await this.webhookEventRepository
       .createQueryBuilder('webhook')
       .select('webhook.status', 'status')
       .addSelect('COUNT(*)', 'count')
@@ -329,7 +330,8 @@ export class WebhooksService {
       .getRawMany();
 
     const statusMap: Record<string, number> = {};
-    for (const row of statusCounts) {
+    for (const rawRow of statusCounts) {
+      const row = rawRow as { status: string; count: string };
       statusMap[row.status] = parseInt(row.count, 10);
     }
 
@@ -347,18 +349,18 @@ export class WebhooksService {
     });
 
     // Tiempo promedio de procesamiento
-    const avgResult = await this.webhookEventRepository
+    const avgResult = (await this.webhookEventRepository
       .createQueryBuilder('webhook')
       .select('AVG(webhook.processingTimeMs)', 'avg')
       .where('webhook.processingTimeMs IS NOT NULL')
-      .getRawOne();
+      .getRawOne()) as { avg: string | null } | null;
 
     const avgProcessingTimeMs = avgResult?.avg
       ? parseFloat(parseFloat(avgResult.avg).toFixed(2))
       : 0;
 
     // Desglose por origen
-    const sourceCounts = await this.webhookEventRepository
+    const sourceCounts: unknown[] = await this.webhookEventRepository
       .createQueryBuilder('webhook')
       .select('webhook.source', 'source')
       .addSelect('COUNT(*)', 'count')
@@ -366,12 +368,13 @@ export class WebhooksService {
       .getRawMany();
 
     const bySource: Record<string, number> = {};
-    for (const row of sourceCounts) {
+    for (const rawRow of sourceCounts) {
+      const row = rawRow as { source: string; count: string };
       bySource[row.source] = parseInt(row.count, 10);
     }
 
     // Desglose por tipo de evento (top 20)
-    const typeCounts = await this.webhookEventRepository
+    const typeCounts: unknown[] = await this.webhookEventRepository
       .createQueryBuilder('webhook')
       .select('webhook.eventType', 'eventType')
       .addSelect('COUNT(*)', 'count')
@@ -381,7 +384,8 @@ export class WebhooksService {
       .getRawMany();
 
     const byEventType: Record<string, number> = {};
-    for (const row of typeCounts) {
+    for (const rawRow of typeCounts) {
+      const row = rawRow as { eventType: string; count: string };
       byEventType[row.eventType] = parseInt(row.count, 10);
     }
 
@@ -389,7 +393,7 @@ export class WebhooksService {
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    const last24hCounts = await this.webhookEventRepository
+    const last24hCounts: unknown[] = await this.webhookEventRepository
       .createQueryBuilder('webhook')
       .select('webhook.status', 'status')
       .addSelect('COUNT(*)', 'count')
@@ -398,7 +402,8 @@ export class WebhooksService {
       .getRawMany();
 
     const last24hMap: Record<string, number> = {};
-    for (const row of last24hCounts) {
+    for (const rawRow of last24hCounts) {
+      const row = rawRow as { status: string; count: string };
       last24hMap[row.status] = parseInt(row.count, 10);
     }
 

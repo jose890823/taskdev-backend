@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TaskStatus } from './entities/task-status.entity';
 import { CreateTaskStatusDto, UpdateTaskStatusDto } from './dto';
@@ -17,36 +17,92 @@ export class TaskStatusesService {
   /** Escuchar evento project.created para crear statuses default */
   @OnEvent('project.created')
   async handleProjectCreated(payload: { projectId: string }) {
-    await this.createDefaultStatuses(payload.projectId);
+    try {
+      await this.createDefaultStatuses(payload.projectId);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Error creando statuses para proyecto ${payload.projectId}: ${msg}`,
+        stack,
+      );
+    }
   }
 
   async createDefaultStatuses(projectId: string): Promise<void> {
     const defaults = [
-      { name: 'Por hacer', color: '#6b7280', position: 0, isDefault: true, isCompleted: false },
-      { name: 'En progreso', color: '#f59e0b', position: 1, isDefault: false, isCompleted: false },
-      { name: 'En revision', color: '#8b5cf6', position: 2, isDefault: false, isCompleted: false },
-      { name: 'Completado', color: '#22c55e', position: 3, isDefault: false, isCompleted: true },
+      {
+        name: 'Por hacer',
+        color: '#6b7280',
+        position: 0,
+        isDefault: true,
+        isCompleted: false,
+      },
+      {
+        name: 'En progreso',
+        color: '#f59e0b',
+        position: 1,
+        isDefault: false,
+        isCompleted: false,
+      },
+      {
+        name: 'En revision',
+        color: '#8b5cf6',
+        position: 2,
+        isDefault: false,
+        isCompleted: false,
+      },
+      {
+        name: 'Completado',
+        color: '#22c55e',
+        position: 3,
+        isDefault: false,
+        isCompleted: true,
+      },
     ];
 
-    for (const status of defaults) {
-      const entity = this.statusRepository.create({ ...status, projectId });
-      await this.statusRepository.save(entity);
-    }
+    const entities = defaults.map((status) =>
+      this.statusRepository.create({ ...status, projectId }),
+    );
+    await this.statusRepository.save(entities);
     this.logger.log(`Task statuses creados para proyecto ${projectId}`);
   }
 
   async createGlobalDefaults(): Promise<void> {
-    const existing = await this.statusRepository.findOne({ where: { projectId: null as any } });
+    const existing = await this.statusRepository.findOne({
+      where: { projectId: IsNull() },
+    });
     if (existing) return;
 
     const defaults = [
-      { name: 'Por hacer', color: '#6b7280', position: 0, isDefault: true, isCompleted: false },
-      { name: 'En progreso', color: '#f59e0b', position: 1, isDefault: false, isCompleted: false },
-      { name: 'Completado', color: '#22c55e', position: 2, isDefault: false, isCompleted: true },
+      {
+        name: 'Por hacer',
+        color: '#6b7280',
+        position: 0,
+        isDefault: true,
+        isCompleted: false,
+      },
+      {
+        name: 'En progreso',
+        color: '#f59e0b',
+        position: 1,
+        isDefault: false,
+        isCompleted: false,
+      },
+      {
+        name: 'Completado',
+        color: '#22c55e',
+        position: 2,
+        isDefault: false,
+        isCompleted: true,
+      },
     ];
 
     for (const status of defaults) {
-      const entity = this.statusRepository.create({ ...status, projectId: null });
+      const entity = this.statusRepository.create({
+        ...status,
+        projectId: null,
+      });
       await this.statusRepository.save(entity);
     }
     this.logger.log('Task statuses globales creados');
@@ -73,12 +129,20 @@ export class TaskStatusesService {
     return status;
   }
 
-  async create(projectId: string, dto: CreateTaskStatusDto): Promise<TaskStatus> {
+  async findByIds(ids: string[]): Promise<TaskStatus[]> {
+    if (ids.length === 0) return [];
+    return this.statusRepository.findBy({ id: In(ids) });
+  }
+
+  async create(
+    projectId: string,
+    dto: CreateTaskStatusDto,
+  ): Promise<TaskStatus> {
     const maxPos = await this.statusRepository
       .createQueryBuilder('s')
       .where('s.projectId = :projectId', { projectId })
       .select('MAX(s.position)', 'max')
-      .getRawOne();
+      .getRawOne<{ max: number | null }>();
 
     const status = this.statusRepository.create({
       ...dto,

@@ -11,7 +11,9 @@ import { ProjectsModule } from '../projects/projects.module';
 import { User } from '../auth/entities/user.entity';
 
 // Importacion condicional del EmailModule y EmailService
+
 let EmailModule: any = null;
+
 let EmailService: any = null;
 const emailModulePath = join(__dirname, '../email/email.module');
 if (
@@ -19,9 +21,11 @@ if (
   existsSync(emailModulePath + '.js')
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- conditional require for optional module
     EmailModule = require('../email/email.module').EmailModule;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- conditional require for optional module
     EmailService = require('../email/email.service').EmailService;
-  } catch (error) {
+  } catch {
     // EmailModule no disponible
   }
 }
@@ -32,6 +36,7 @@ if (
     OrganizationsModule,
     ProjectsModule,
     ConfigModule,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- spreading optional dynamic module
     ...(EmailModule ? [EmailModule] : []),
   ],
   controllers: [InvitationsController],
@@ -41,6 +46,7 @@ if (
       ? [
           {
             provide: 'EmailService',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- EmailService is a dynamic require result; type-safe at runtime
             useExisting: EmailService,
           },
         ]

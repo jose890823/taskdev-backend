@@ -242,50 +242,72 @@ export class LoginAttemptService {
   }> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const attempts = await this.loginAttemptRepository.find({
-      where: {
-        createdAt: MoreThanOrEqual(since),
-      },
+    const [total, successful] = await Promise.all([
+      this.loginAttemptRepository.count({
+        where: { createdAt: MoreThanOrEqual(since) },
+      }),
+      this.loginAttemptRepository.count({
+        where: { createdAt: MoreThanOrEqual(since), success: true },
+      }),
+    ]);
+
+    const failed = total - successful;
+
+    // Top failed IPs via raw query
+    const topFailedIps: { ip: string; count: number }[] =
+      await this.loginAttemptRepository
+        .createQueryBuilder('attempt')
+        .select('"ipAddress"', 'ip')
+        .addSelect('COUNT(*)', 'count')
+        .where('attempt."createdAt" >= :since', { since })
+        .andWhere('attempt.success = :success', { success: false })
+        .groupBy('"ipAddress"')
+        .orderBy('count', 'DESC')
+        .limit(10)
+        .getRawMany();
+
+    // Top failed emails
+    const topFailedEmails: { email: string; count: number }[] =
+      await this.loginAttemptRepository
+        .createQueryBuilder('attempt')
+        .select('attempt.email', 'email')
+        .addSelect('COUNT(*)', 'count')
+        .where('attempt."createdAt" >= :since', { since })
+        .andWhere('attempt.success = :success', { success: false })
+        .groupBy('attempt.email')
+        .orderBy('count', 'DESC')
+        .limit(10)
+        .getRawMany();
+
+    // Failure reasons
+    const rawReasons: { reason: string; count: string }[] =
+      await this.loginAttemptRepository
+        .createQueryBuilder('attempt')
+        .select('"failureReason"', 'reason')
+        .addSelect('COUNT(*)', 'count')
+        .where('attempt."createdAt" >= :since', { since })
+        .andWhere('attempt.success = :success', { success: false })
+        .andWhere('"failureReason" IS NOT NULL')
+        .groupBy('"failureReason"')
+        .getRawMany();
+
+    const failureReasons: Record<string, number> = {};
+    rawReasons.forEach((r) => {
+      failureReasons[r.reason] = parseInt(String(r.count), 10);
     });
 
-    const successful = attempts.filter((a) => a.success).length;
-    const failed = attempts.filter((a) => !a.success).length;
-
-    // Contar por IP fallida
-    const ipCounts: Record<string, number> = {};
-    const emailCounts: Record<string, number> = {};
-    const reasonCounts: Record<string, number> = {};
-
-    attempts
-      .filter((a) => !a.success)
-      .forEach((attempt) => {
-        ipCounts[attempt.ipAddress] = (ipCounts[attempt.ipAddress] || 0) + 1;
-        emailCounts[attempt.email] = (emailCounts[attempt.email] || 0) + 1;
-        if (attempt.failureReason) {
-          reasonCounts[attempt.failureReason] =
-            (reasonCounts[attempt.failureReason] || 0) + 1;
-        }
-      });
-
-    const topFailedIps = Object.entries(ipCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([ip, count]) => ({ ip, count }));
-
-    const topFailedEmails = Object.entries(emailCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([email, count]) => ({ email, count }));
+    // Parse counts from raw queries (they come as strings)
+    topFailedIps.forEach((r) => (r.count = parseInt(String(r.count), 10)));
+    topFailedEmails.forEach((r) => (r.count = parseInt(String(r.count), 10)));
 
     return {
-      total: attempts.length,
+      total,
       successful,
       failed,
-      successRate:
-        attempts.length > 0 ? (successful / attempts.length) * 100 : 0,
+      successRate: total > 0 ? (successful / total) * 100 : 0,
       topFailedIps,
       topFailedEmails,
-      failureReasons: reasonCounts,
+      failureReasons,
     };
   }
 }

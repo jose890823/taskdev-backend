@@ -1,7 +1,20 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, Query, BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto, BulkUpdatePositionsDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -17,9 +30,17 @@ export class TasksController {
   @Post()
   @ApiOperation({ summary: 'Crear tarea' })
   async create(@Body() dto: CreateTaskDto, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskCreateAccess(dto.projectId || null, user.id, user.isSuperAdmin());
+    await this.tasksService.verifyTaskCreateAccess(
+      dto.projectId || null,
+      user.id,
+      user.isSuperAdmin(),
+    );
     if (dto.organizationId) {
-      await this.tasksService.verifyOrganizationAccess(dto.organizationId, user.id, user.isSuperAdmin());
+      await this.tasksService.verifyOrganizationAccess(
+        dto.organizationId,
+        user.id,
+        user.isSuperAdmin(),
+      );
     }
     return this.tasksService.create(dto, user);
   }
@@ -27,7 +48,12 @@ export class TasksController {
   @Get()
   @ApiOperation({ summary: 'Listar tareas con filtros' })
   @ApiQuery({ name: 'projectId', required: false })
-  @ApiQuery({ name: 'projectIds', required: false, description: 'UUIDs de proyectos separados por coma (ej: uuid1,uuid2,uuid3)' })
+  @ApiQuery({
+    name: 'projectIds',
+    required: false,
+    description:
+      'UUIDs de proyectos separados por coma (ej: uuid1,uuid2,uuid3)',
+  })
   @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'statusId', required: false })
   @ApiQuery({ name: 'assignedToId', required: false })
@@ -46,27 +72,55 @@ export class TasksController {
     @Query('limit') limit?: string,
   ) {
     if (projectId) {
-      await this.tasksService.verifyProjectAccess(projectId, user.id, user.isSuperAdmin());
+      await this.tasksService.verifyProjectAccess(
+        projectId,
+        user.id,
+        user.isSuperAdmin(),
+      );
     }
     const parsedProjectIds = projectIds
-      ? projectIds.split(',').map(id => id.trim()).filter(Boolean)
+      ? projectIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
       : undefined;
     if (parsedProjectIds && parsedProjectIds.length > 10) {
-      throw new BadRequestException('No se pueden consultar mas de 10 proyectos a la vez');
+      throw new BadRequestException(
+        'No se pueden consultar mas de 10 proyectos a la vez',
+      );
     }
     if (parsedProjectIds && parsedProjectIds.length > 0) {
       for (const pid of parsedProjectIds) {
-        await this.tasksService.verifyProjectAccess(pid, user.id, user.isSuperAdmin());
+        await this.tasksService.verifyProjectAccess(
+          pid,
+          user.id,
+          user.isSuperAdmin(),
+        );
       }
     }
     if (organizationId) {
-      await this.tasksService.verifyOrganizationAccess(organizationId, user.id, user.isSuperAdmin());
+      await this.tasksService.verifyOrganizationAccess(
+        organizationId,
+        user.id,
+        user.isSuperAdmin(),
+      );
     }
-    return this.tasksService.findAll({
-      projectId, projectIds: parsedProjectIds, organizationId, statusId, assignedToId, type,
-      page: page ? Math.max(1, parseInt(page) || 1) : undefined,
-      limit: limit ? Math.min(100, Math.max(1, parseInt(limit) || 20)) : undefined,
-    }, user.id, user.isSuperAdmin());
+    return this.tasksService.findAll(
+      {
+        projectId,
+        projectIds: parsedProjectIds,
+        organizationId,
+        statusId,
+        assignedToId,
+        type,
+        page: page ? Math.max(1, parseInt(page) || 1) : undefined,
+        limit: limit
+          ? Math.min(100, Math.max(1, parseInt(limit) || 20))
+          : undefined,
+      },
+      user.id,
+      user.isSuperAdmin(),
+    );
   }
 
   @Get('my')
@@ -79,16 +133,27 @@ export class TasksController {
   @Get('daily')
   @ApiOperation({ summary: 'Tareas diarias' })
   @ApiQuery({ name: 'date', required: false })
-  async findDailyTasks(@CurrentUser() user: User, @Query('date') date?: string) {
+  async findDailyTasks(
+    @CurrentUser() user: User,
+    @Query('date') date?: string,
+  ) {
     return this.tasksService.findDailyTasks(user.id, date);
   }
 
   @Patch('bulk-positions')
-  @ApiOperation({ summary: 'Actualizar posiciones y estados en bulk (drag & drop)' })
-  async bulkUpdatePositions(@Body() dto: BulkUpdatePositionsDto, @CurrentUser() user: User) {
-    for (const item of dto.items) {
-      await this.tasksService.verifyTaskEditAccess(item.id, user.id, user.isSuperAdmin());
-    }
+  @ApiOperation({
+    summary: 'Actualizar posiciones y estados en bulk (drag & drop)',
+  })
+  async bulkUpdatePositions(
+    @Body() dto: BulkUpdatePositionsDto,
+    @CurrentUser() user: User,
+  ) {
+    const taskIds = dto.items.map((item) => item.id);
+    await this.tasksService.verifyBulkEditAccess(
+      taskIds,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.tasksService.bulkUpdatePositions(dto.items);
   }
 
@@ -101,15 +166,27 @@ export class TasksController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar tarea' })
-  async update(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskEditAccess(id, user.id, user.isSuperAdmin());
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateTaskDto,
+    @CurrentUser() user: User,
+  ) {
+    await this.tasksService.verifyTaskEditAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.tasksService.update(id, dto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar tarea' })
   async remove(@Param('id') id: string, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskDeleteAccess(id, user.id, user.isSuperAdmin());
+    await this.tasksService.verifyTaskDeleteAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+    );
     await this.tasksService.remove(id);
     return { message: 'Tarea eliminada' };
   }
@@ -128,8 +205,16 @@ export class TasksController {
     @Body() dto: CreateTaskDto,
     @CurrentUser() user: User,
   ) {
-    const parent = await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
-    await this.tasksService.verifyTaskCreateAccess(parent.projectId || null, user.id, user.isSuperAdmin());
+    const parent = await this.tasksService.verifyTaskAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+    );
+    await this.tasksService.verifyTaskCreateAccess(
+      parent.projectId || null,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.tasksService.createSubtask(id, dto, user);
   }
 }

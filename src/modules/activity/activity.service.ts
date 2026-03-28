@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { ActivityLog, ActivityType } from './entities/activity-log.entity';
@@ -34,7 +34,11 @@ export class ActivityService {
     return entry;
   }
 
-  async findByProject(projectId: string, page = 1, limit = 20): Promise<{ data: ActivityLog[]; total: number }> {
+  async findByProject(
+    projectId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ data: ActivityLog[]; total: number }> {
     const [data, total] = await this.activityRepository.findAndCount({
       where: { projectId },
       order: { createdAt: 'DESC' },
@@ -44,7 +48,11 @@ export class ActivityService {
     return { data, total };
   }
 
-  async findByOrganization(organizationId: string, page = 1, limit = 20): Promise<{ data: ActivityLog[]; total: number }> {
+  async findByOrganization(
+    organizationId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ data: ActivityLog[]; total: number }> {
     const [data, total] = await this.activityRepository.findAndCount({
       where: { organizationId },
       order: { createdAt: 'DESC' },
@@ -54,7 +62,11 @@ export class ActivityService {
     return { data, total };
   }
 
-  async findByUser(userId: string, page = 1, limit = 20): Promise<{ data: ActivityLog[]; total: number }> {
+  async findByUser(
+    userId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ data: ActivityLog[]; total: number }> {
     const [data, total] = await this.activityRepository.findAndCount({
       where: { userId },
       order: { createdAt: 'DESC' },
@@ -65,6 +77,13 @@ export class ActivityService {
   }
 
   async getDailySummary(userId: string, date?: string): Promise<ActivityLog[]> {
+    // Defense-in-depth: validate date format even if controller already checks
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException(
+        'Formato de fecha inválido. Use YYYY-MM-DD',
+      );
+    }
+
     const targetDate = date ? new Date(date) : new Date();
     const start = new Date(targetDate);
     start.setHours(0, 0, 0, 0);

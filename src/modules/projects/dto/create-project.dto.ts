@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateProjectDto {
   @ApiProperty({ example: 'Mi Proyecto', description: 'Nombre del proyecto' })
@@ -18,12 +24,18 @@ export class CreateProjectDto {
   @IsString()
   color?: string;
 
-  @ApiProperty({ description: 'ID de organizacion (omitir para proyecto personal)', required: false })
+  @ApiProperty({
+    description: 'ID de organizacion (omitir para proyecto personal)',
+    required: false,
+  })
   @IsOptional()
   @IsUUID('4', { message: 'organizationId debe ser UUID valido' })
   organizationId?: string;
 
-  @ApiProperty({ description: 'ID del proyecto padre (para sub-proyectos)', required: false })
+  @ApiProperty({
+    description: 'ID del proyecto padre (para sub-proyectos)',
+    required: false,
+  })
   @IsOptional()
   @IsUUID('4', { message: 'parentId debe ser UUID valido' })
   parentId?: string;

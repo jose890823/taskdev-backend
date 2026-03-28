@@ -62,8 +62,11 @@ export class ModuleManagerService implements OnModuleInit {
           });
         }
       });
-    } catch (error) {
-      this.logger.error('Error escaneando módulos:', error.message);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error escaneando módulos:',
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -167,10 +170,10 @@ export class ModuleManagerService implements OnModuleInit {
     if (this.isModuleAvailable(moduleName)) {
       try {
         return await callback();
-      } catch (error) {
+      } catch (error: unknown) {
         this.logger.error(
           `Error ejecutando función del módulo '${moduleName}':`,
-          error.message,
+          error instanceof Error ? error.message : String(error),
         );
         return fallback ? await fallback() : null;
       }

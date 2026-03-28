@@ -14,17 +14,83 @@ const EVENT_SEEDS: Array<{
   isEnabled: boolean;
   category: string;
 }> = [
-  { eventType: 'task_assigned', label: 'Tarea asignada', description: 'Cuando un usuario es asignado a una tarea', isEnabled: true, category: 'tasks' },
-  { eventType: 'task_unassigned', label: 'Tarea desasignada', description: 'Cuando un usuario es removido de una tarea', isEnabled: true, category: 'tasks' },
-  { eventType: 'task_status_changed', label: 'Estado de tarea cambiado', description: 'Cuando cambia el estado de una tarea', isEnabled: true, category: 'tasks' },
-  { eventType: 'task_completed', label: 'Tarea completada', description: 'Cuando una tarea se marca como completada', isEnabled: true, category: 'tasks' },
-  { eventType: 'task_commented', label: 'Comentario en tarea', description: 'Cuando alguien comenta en una tarea', isEnabled: true, category: 'tasks' },
-  { eventType: 'task_due_soon', label: 'Tarea por vencer', description: 'Cuando una tarea esta proxima a su fecha limite', isEnabled: false, category: 'tasks' },
-  { eventType: 'subtask_created', label: 'Subtarea creada', description: 'Cuando se crea una subtarea', isEnabled: true, category: 'tasks' },
-  { eventType: 'project_member_added', label: 'Agregado a proyecto', description: 'Cuando un usuario es agregado a un proyecto', isEnabled: true, category: 'projects' },
-  { eventType: 'project_member_removed', label: 'Removido de proyecto', description: 'Cuando un usuario es removido de un proyecto', isEnabled: true, category: 'projects' },
-  { eventType: 'org_member_added', label: 'Agregado a organizacion', description: 'Cuando un usuario es agregado a una organizacion', isEnabled: true, category: 'organizations' },
-  { eventType: 'org_invitation_received', label: 'Invitacion recibida', description: 'Cuando un usuario recibe una invitacion a una organizacion', isEnabled: true, category: 'organizations' },
+  {
+    eventType: 'task_assigned',
+    label: 'Tarea asignada',
+    description: 'Cuando un usuario es asignado a una tarea',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'task_unassigned',
+    label: 'Tarea desasignada',
+    description: 'Cuando un usuario es removido de una tarea',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'task_status_changed',
+    label: 'Estado de tarea cambiado',
+    description: 'Cuando cambia el estado de una tarea',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'task_completed',
+    label: 'Tarea completada',
+    description: 'Cuando una tarea se marca como completada',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'task_commented',
+    label: 'Comentario en tarea',
+    description: 'Cuando alguien comenta en una tarea',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'task_due_soon',
+    label: 'Tarea por vencer',
+    description: 'Cuando una tarea esta proxima a su fecha limite',
+    isEnabled: false,
+    category: 'tasks',
+  },
+  {
+    eventType: 'subtask_created',
+    label: 'Subtarea creada',
+    description: 'Cuando se crea una subtarea',
+    isEnabled: true,
+    category: 'tasks',
+  },
+  {
+    eventType: 'project_member_added',
+    label: 'Agregado a proyecto',
+    description: 'Cuando un usuario es agregado a un proyecto',
+    isEnabled: true,
+    category: 'projects',
+  },
+  {
+    eventType: 'project_member_removed',
+    label: 'Removido de proyecto',
+    description: 'Cuando un usuario es removido de un proyecto',
+    isEnabled: true,
+    category: 'projects',
+  },
+  {
+    eventType: 'org_member_added',
+    label: 'Agregado a organizacion',
+    description: 'Cuando un usuario es agregado a una organizacion',
+    isEnabled: true,
+    category: 'organizations',
+  },
+  {
+    eventType: 'org_invitation_received',
+    label: 'Invitacion recibida',
+    description: 'Cuando un usuario recibe una invitacion a una organizacion',
+    isEnabled: true,
+    category: 'organizations',
+  },
 ];
 
 @Injectable()
@@ -81,13 +147,18 @@ export class NotificationConfigService implements OnApplicationBootstrap {
    * Obtener todas las configuraciones
    */
   async findAll(): Promise<NotificationEventConfig[]> {
-    return this.configRepository.find({ order: { category: 'ASC', eventType: 'ASC' } });
+    return this.configRepository.find({
+      order: { category: 'ASC', eventType: 'ASC' },
+    });
   }
 
   /**
    * Actualizar configuración de un evento
    */
-  async update(id: string, dto: UpdateEventConfigDto): Promise<NotificationEventConfig> {
+  async update(
+    id: string,
+    dto: UpdateEventConfigDto,
+  ): Promise<NotificationEventConfig> {
     const config = await this.configRepository.findOne({ where: { id } });
     if (!config) {
       throw new Error('Configuracion de evento no encontrada');
@@ -99,7 +170,9 @@ export class NotificationConfigService implements OnApplicationBootstrap {
     // Refrescar cache
     this.configCache.set(config.eventType, dto.isEnabled);
 
-    this.logger.log(`Evento ${config.eventType} ${dto.isEnabled ? 'habilitado' : 'deshabilitado'}`);
+    this.logger.log(
+      `Evento ${config.eventType} ${dto.isEnabled ? 'habilitado' : 'deshabilitado'}`,
+    );
     return updated;
   }
 }

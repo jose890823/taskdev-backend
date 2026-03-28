@@ -27,7 +27,9 @@ export class RolesGuard implements CanActivate {
     }
 
     // Obtener el usuario del request (ya autenticado por JwtAuthGuard)
-    const { user } = context.switchToHttp().getRequest();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user: { roles?: UserRole[] | string; role?: UserRole } }>();
 
     if (!user) {
       return false;
@@ -46,7 +48,10 @@ export class RolesGuard implements CanActivate {
    * Obtiene los roles del usuario, soportando tanto el nuevo formato (roles array)
    * como el antiguo (role string) para compatibilidad durante la migración
    */
-  private getUserRoles(user: any): UserRole[] {
+  private getUserRoles(user: {
+    roles?: UserRole[] | string;
+    role?: UserRole;
+  }): UserRole[] {
     // Si tiene el nuevo campo 'roles' como array
     if (Array.isArray(user.roles)) {
       return user.roles;

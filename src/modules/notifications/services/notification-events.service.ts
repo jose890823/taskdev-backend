@@ -71,7 +71,9 @@ export class NotificationEventsService {
       this.gateway.sendToUser(params.userId, notification);
 
       // Actualizar unread count
-      const count = await this.notificationsService.getUnreadCount(params.userId);
+      const count = await this.notificationsService.getUnreadCount(
+        params.userId,
+      );
       this.gateway.sendUnreadCount(params.userId, count);
     }
   }
@@ -150,21 +152,23 @@ export class NotificationEventsService {
     const priorityTag = this.getPriorityLabel(payload.taskPriority);
     const titleSuffix = priorityTag ? ` [${priorityTag}]` : '';
 
-    for (const userId of payload.assigneeIds) {
-      // No notificar al actor
-      if (userId === payload.changedById) continue;
-
-      await this.createAndPush({
-        eventType: 'task_status_changed',
-        userId,
-        type: NotificationType.TASK_STATUS_CHANGED,
-        title: 'Estado de tarea cambiado',
-        message: `${payload.changedByName} cambio "${payload.taskTitle}"${titleSuffix} de ${payload.oldStatusName} a ${payload.newStatusName}`,
-        actionUrl: `/tasks/${payload.taskId}`,
-        referenceId: payload.taskId,
-        referenceType: 'task',
-      });
-    }
+    const recipients = payload.assigneeIds.filter(
+      (id) => id !== payload.changedById,
+    );
+    await Promise.allSettled(
+      recipients.map((userId) =>
+        this.createAndPush({
+          eventType: 'task_status_changed',
+          userId,
+          type: NotificationType.TASK_STATUS_CHANGED,
+          title: 'Estado de tarea cambiado',
+          message: `${payload.changedByName} cambio "${payload.taskTitle}"${titleSuffix} de ${payload.oldStatusName} a ${payload.newStatusName}`,
+          actionUrl: `/tasks/${payload.taskId}`,
+          referenceId: payload.taskId,
+          referenceType: 'task',
+        }),
+      ),
+    );
   }
 
   @OnEvent('task.completed')
@@ -181,20 +185,23 @@ export class NotificationEventsService {
     const priorityTag = this.getPriorityLabel(payload.taskPriority);
     const titleSuffix = priorityTag ? ` [${priorityTag}]` : '';
 
-    for (const userId of payload.assigneeIds) {
-      if (userId === payload.completedById) continue;
-
-      await this.createAndPush({
-        eventType: 'task_completed',
-        userId,
-        type: NotificationType.TASK_COMPLETED,
-        title: 'Tarea completada',
-        message: `${payload.completedByName} completo la tarea "${payload.taskTitle}"${titleSuffix}`,
-        actionUrl: `/tasks/${payload.taskId}`,
-        referenceId: payload.taskId,
-        referenceType: 'task',
-      });
-    }
+    const recipients = payload.assigneeIds.filter(
+      (id) => id !== payload.completedById,
+    );
+    await Promise.allSettled(
+      recipients.map((userId) =>
+        this.createAndPush({
+          eventType: 'task_completed',
+          userId,
+          type: NotificationType.TASK_COMPLETED,
+          title: 'Tarea completada',
+          message: `${payload.completedByName} completo la tarea "${payload.taskTitle}"${titleSuffix}`,
+          actionUrl: `/tasks/${payload.taskId}`,
+          referenceId: payload.taskId,
+          referenceType: 'task',
+        }),
+      ),
+    );
   }
 
   @OnEvent('task.commented')
@@ -211,21 +218,23 @@ export class NotificationEventsService {
     const priorityTag = this.getPriorityLabel(payload.taskPriority);
     const titleSuffix = priorityTag ? ` [${priorityTag}]` : '';
 
-    for (const userId of payload.assigneeIds) {
-      // No notificar al que comento
-      if (userId === payload.commentById) continue;
-
-      await this.createAndPush({
-        eventType: 'task_commented',
-        userId,
-        type: NotificationType.TASK_COMMENTED,
-        title: 'Comentario en tarea',
-        message: `${payload.commentByName} comento en "${payload.taskTitle}"${titleSuffix}`,
-        actionUrl: `/tasks/${payload.taskId}`,
-        referenceId: payload.taskId,
-        referenceType: 'task',
-      });
-    }
+    const recipients = payload.assigneeIds.filter(
+      (id) => id !== payload.commentById,
+    );
+    await Promise.allSettled(
+      recipients.map((userId) =>
+        this.createAndPush({
+          eventType: 'task_commented',
+          userId,
+          type: NotificationType.TASK_COMMENTED,
+          title: 'Comentario en tarea',
+          message: `${payload.commentByName} comento en "${payload.taskTitle}"${titleSuffix}`,
+          actionUrl: `/tasks/${payload.taskId}`,
+          referenceId: payload.taskId,
+          referenceType: 'task',
+        }),
+      ),
+    );
   }
 
   @OnEvent('subtask.created')
@@ -243,20 +252,23 @@ export class NotificationEventsService {
     const priorityTag = this.getPriorityLabel(payload.taskPriority);
     const titleSuffix = priorityTag ? ` [${priorityTag}]` : '';
 
-    for (const userId of payload.assigneeIds) {
-      if (userId === payload.createdById) continue;
-
-      await this.createAndPush({
-        eventType: 'subtask_created',
-        userId,
-        type: NotificationType.SUBTASK_CREATED,
-        title: 'Subtarea creada',
-        message: `${payload.createdByName} creo la subtarea "${payload.subtaskTitle}"${titleSuffix} en "${payload.parentTaskTitle}"`,
-        actionUrl: `/tasks/${payload.parentTaskId}`,
-        referenceId: payload.parentTaskId,
-        referenceType: 'task',
-      });
-    }
+    const recipients = payload.assigneeIds.filter(
+      (id) => id !== payload.createdById,
+    );
+    await Promise.allSettled(
+      recipients.map((userId) =>
+        this.createAndPush({
+          eventType: 'subtask_created',
+          userId,
+          type: NotificationType.SUBTASK_CREATED,
+          title: 'Subtarea creada',
+          message: `${payload.createdByName} creo la subtarea "${payload.subtaskTitle}"${titleSuffix} en "${payload.parentTaskTitle}"`,
+          actionUrl: `/tasks/${payload.parentTaskId}`,
+          referenceId: payload.parentTaskId,
+          referenceType: 'task',
+        }),
+      ),
+    );
   }
 
   // ============================================
@@ -337,7 +349,9 @@ export class NotificationEventsService {
     invitedByName: string;
     token: string;
   }): Promise<void> {
-    this.logger.debug(`Evento org.invitation_received: ${payload.organizationName}`);
+    this.logger.debug(
+      `Evento org.invitation_received: ${payload.organizationName}`,
+    );
 
     await this.createAndPush({
       eventType: 'org_invitation_received',
@@ -363,7 +377,8 @@ export class NotificationEventsService {
       userId: payload.userId,
       type: NotificationType.PASSWORD_CHANGED,
       title: 'Contrasena actualizada',
-      message: 'Tu contrasena ha sido cambiada exitosamente. Si no fuiste tu, contacta soporte.',
+      message:
+        'Tu contrasena ha sido cambiada exitosamente. Si no fuiste tu, contacta soporte.',
       priority: NotificationPriority.HIGH,
       actionUrl: '/support',
     });

@@ -1,6 +1,15 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn,
-  DeleteDateColumn, Index, BeforeInsert, ManyToOne, OneToMany, JoinColumn,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Index,
+  BeforeInsert,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
@@ -25,7 +34,11 @@ export class ProjectModule {
   @Column({ type: 'uuid' })
   projectId: string;
 
-  @ApiProperty({ example: null, required: false, description: 'ID del modulo padre (null = raiz)' })
+  @ApiProperty({
+    example: null,
+    required: false,
+    description: 'ID del modulo padre (null = raiz)',
+  })
   @Column({ type: 'uuid', nullable: true })
   parentId: string | null;
 

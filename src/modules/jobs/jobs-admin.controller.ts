@@ -21,7 +21,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '../auth/entities/user.entity';
+import { User, UserRole } from '../auth/entities/user.entity';
 
 import { JobsService } from './jobs.service';
 import { TriggerJobDto, JobFilterDto, JobExecutionResponseDto } from './dto';
@@ -57,7 +57,7 @@ export class JobsAdminController {
   @ApiResponse({ status: 400, description: 'Nombre de job invalido' })
   @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
-  async triggerJob(@Body() dto: TriggerJobDto, @CurrentUser() user: any) {
+  async triggerJob(@Body() dto: TriggerJobDto, @CurrentUser() user: User) {
     return this.jobsService.triggerJob(dto.jobName, user.id, dto.input);
   }
 

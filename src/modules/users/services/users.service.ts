@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User, UserRole } from '../../auth/entities/user.entity';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { UpdateUserAdminDto } from '../dto/update-user-admin.dto';
@@ -225,7 +225,12 @@ export class UsersService {
    */
   async findAll(filter: UserFilterDto): Promise<{
     data: User[];
-    pagination: { total: number; page: number; limit: number; totalPages: number };
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     const queryBuilder = this.userRepository.createQueryBuilder('user');
 
@@ -244,11 +249,17 @@ export class UsersService {
       });
     }
 
-    // Filter by role (busca usuarios que tengan este rol en su array de roles)
+    // Filter by role — exact match within comma-separated simple-array
     if (filter.role) {
-      queryBuilder.andWhere('user.roles LIKE :role', {
-        role: `%${filter.role}%`,
-      });
+      queryBuilder.andWhere(
+        '(user.roles = :exactRole OR user.roles LIKE :startRole OR user.roles LIKE :endRole OR user.roles LIKE :midRole)',
+        {
+          exactRole: filter.role,
+          startRole: `${filter.role},%`,
+          endRole: `%,${filter.role}`,
+          midRole: `%,${filter.role},%`,
+        },
+      );
     }
     if (filter.isActive !== undefined) {
       queryBuilder.andWhere('user.isActive = :isActive', {
@@ -266,11 +277,20 @@ export class UsersService {
       });
     }
 
-    // Sorting
-    queryBuilder.orderBy(
-      `user.${filter.sortBy || 'createdAt'}`,
-      filter.sortOrder || 'DESC',
-    );
+    // Sorting — whitelist to prevent injection via sortBy
+    const ALLOWED_SORT_FIELDS = [
+      'createdAt',
+      'updatedAt',
+      'email',
+      'firstName',
+      'lastName',
+      'isActive',
+    ];
+    const sortField =
+      filter.sortBy && ALLOWED_SORT_FIELDS.includes(filter.sortBy)
+        ? filter.sortBy
+        : 'createdAt';
+    queryBuilder.orderBy(`user.${sortField}`, filter.sortOrder || 'DESC');
 
     // Pagination
     const page = filter.page || 1;
@@ -380,7 +400,15 @@ export class UsersService {
   private async countUsersWithRole(role: UserRole): Promise<number> {
     return this.userRepository
       .createQueryBuilder('user')
-      .where('user.roles LIKE :role', { role: `%${role}%` })
+      .where(
+        '(user.roles = :exactRole OR user.roles LIKE :startRole OR user.roles LIKE :endRole OR user.roles LIKE :midRole)',
+        {
+          exactRole: role,
+          startRole: `${role},%`,
+          endRole: `%,${role}`,
+          midRole: `%,${role},%`,
+        },
+      )
       .getCount();
   }
 
@@ -581,25 +609,35 @@ export class UsersService {
     emailVerified: number;
     phoneVerified: number;
   }> {
-    const all = await this.userRepository.find();
+    const [total, active, emailVerified, phoneVerified] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({ where: { isActive: true } }),
+      this.userRepository.count({ where: { emailVerified: true } }),
+      this.userRepository.count({ where: { phoneVerified: true } }),
+    ]);
 
-    const stats = {
-      total: all.length,
-      active: all.filter((u) => u.isActive).length,
-      inactive: all.filter((u) => !u.isActive).length,
-      byRole: {} as Record<UserRole, number>,
-      emailVerified: all.filter((u) => u.emailVerified).length,
-      phoneVerified: all.filter((u) => u.phoneVerified).length,
-    };
+    const inactive = total - active;
 
-    // Count by role (usuarios que tienen este rol en su array)
-    Object.values(UserRole).forEach((role) => {
-      stats.byRole[role] = all.filter((u) => u.hasRole(role)).length;
-    });
+    // Count by role using raw query since roles is simple-array
+    const byRole = {} as Record<UserRole, number>;
+    for (const role of Object.values(UserRole)) {
+      const count = await this.userRepository
+        .createQueryBuilder('user')
+        .where(
+          '(user.roles = :exactRole OR user.roles LIKE :startRole OR user.roles LIKE :endRole OR user.roles LIKE :midRole)',
+          {
+            exactRole: role,
+            startRole: `${role},%`,
+            endRole: `%,${role}`,
+            midRole: `%,${role},%`,
+          },
+        )
+        .getCount();
+      byRole[role] = count;
+    }
 
-    return stats;
+    return { total, active, inactive, byRole, emailVerified, phoneVerified };
   }
-
 
   // ============================================
   // HELPER METHODS
@@ -714,16 +752,19 @@ export class UsersService {
   ): Promise<string> {
     const baseSlug = this.generateSlugFromName(firstName, lastName);
     let slug = baseSlug;
-    let counter = 1;
 
-    while (true) {
+    const MAX_ATTEMPTS = 5;
+    for (let counter = 0; counter <= MAX_ATTEMPTS; counter++) {
       const existing = await this.userRepository.findOne({ where: { slug } });
       if (!existing || existing.id === excludeUserId) {
         return slug;
       }
-      slug = `${baseSlug}-${counter}`;
-      counter++;
+      slug = `${baseSlug}-${counter + 1}`;
     }
+
+    // Fallback: random suffix to guarantee uniqueness
+    const randomSuffix = crypto.randomBytes(3).toString('hex');
+    return `${baseSlug}-${randomSuffix}`;
   }
 
   /**

@@ -1,13 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Type } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { DynamicModule, Type } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export interface ModuleInfo {
   name: string;
   path: string;
-  module: Type<any> | null;
+  module: Type<unknown> | null;
   loaded: boolean;
   error?: string;
 }
@@ -42,16 +41,15 @@ export class ModuleLoaderService {
           moduleInfos.push(moduleInfo);
           this.loadedModules.set(moduleDir, moduleInfo);
         }
-      } catch (error) {
-        this.logger.warn(
-          `Error cargando módulo ${moduleDir}: ${error.message}`,
-        );
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Error cargando módulo ${moduleDir}: ${msg}`);
         const failedModuleInfo: ModuleInfo = {
           name: moduleDir,
           path: path.join(modulesPath, moduleDir),
           module: null,
           loaded: false,
-          error: error.message,
+          error: msg,
         };
         moduleInfos.push(failedModuleInfo);
         this.loadedModules.set(moduleDir, failedModuleInfo);
@@ -90,15 +88,20 @@ export class ModuleLoaderService {
     }
 
     try {
-      const moduleExport = await import(moduleFilePath);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- dynamic import returns unknown module shape
+      const moduleExport: Record<string, unknown> = await import(
+        moduleFilePath
+      );
+      const moduleKey = `${this.capitalize(moduleDir)}Module`;
       const ModuleClass =
-        moduleExport.default ||
-        moduleExport[`${this.capitalize(moduleDir)}Module`] ||
+        moduleExport.default ??
+        moduleExport[moduleKey] ??
         Object.values(moduleExport).find(
-          (exp) =>
+          (exp): exp is Type<unknown> =>
             typeof exp === 'function' &&
-            exp.name &&
-            exp.name.includes('Module'),
+            'name' in exp &&
+            typeof (exp as { name: unknown }).name === 'string' &&
+            (exp as { name: string }).name.includes('Module'),
         );
 
       if (!ModuleClass) {
@@ -110,11 +113,12 @@ export class ModuleLoaderService {
       return {
         name: moduleDir,
         path: modulePath,
-        module: ModuleClass as Type<any>,
+        module: ModuleClass as Type<unknown>,
         loaded: true,
       };
-    } catch (error) {
-      throw new Error(`Error importando módulo: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Error importando módulo: ${msg}`);
     }
   }
 
@@ -144,9 +148,10 @@ export class ModuleLoaderService {
 
     try {
       return this.moduleRef.get(serviceToken, { strict: false });
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Servicio ${serviceToken.toString()} no encontrado en módulo ${moduleName}: ${error.message}`,
+        `Servicio ${serviceToken.toString()} no encontrado en módulo ${moduleName}: ${msg}`,
       );
       return null;
     }

@@ -10,13 +10,28 @@ export class EncryptionService {
   private readonly ivLength = 16; // For AES, this is always 16
 
   constructor(private configService: ConfigService) {
-    // Get encryption key from environment or use a default for development
-    const keyString =
-      this.configService.get<string>('ENCRYPTION_KEY') ||
-      'michambita_default_encryption_key_32chars_long!!';
+    const keyString = this.configService.get<string>('ENCRYPTION_KEY');
+
+    if (!keyString && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'ENCRYPTION_KEY is required in production. Set it in your environment variables.',
+      );
+    }
+
+    const effectiveKey =
+      keyString || 'dev-only-encryption-key-do-not-use-in-prod';
+
+    if (!keyString) {
+      this.logger.warn(
+        '⚠️  ENCRYPTION_KEY no configurada — usando clave de desarrollo. NO usar en producción.',
+      );
+    }
 
     // Ensure the key is exactly 32 bytes (256 bits) for AES-256
-    this.encryptionKey = crypto.createHash('sha256').update(keyString).digest();
+    this.encryptionKey = crypto
+      .createHash('sha256')
+      .update(effectiveKey)
+      .digest();
 
     this.logger.log('🔐 EncryptionService initialized with AES-256-CBC');
   }
@@ -48,8 +63,11 @@ export class EncryptionService {
 
       // Return iv + encrypted data (separated by :)
       return `${iv.toString('hex')}:${encrypted}`;
-    } catch (error) {
-      this.logger.error('Error encrypting data', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error encrypting data',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new Error('Failed to encrypt data');
     }
   }
@@ -86,8 +104,11 @@ export class EncryptionService {
       decrypted += decipher.final('utf8');
 
       return decrypted;
-    } catch (error) {
-      this.logger.error('Error decrypting data', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error decrypting data',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new Error('Failed to decrypt data');
     }
   }
@@ -105,8 +126,11 @@ export class EncryptionService {
     try {
       const jsonString = JSON.stringify(data);
       return this.encrypt(jsonString);
-    } catch (error) {
-      this.logger.error('Error encrypting object', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error encrypting object',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new Error('Failed to encrypt object');
     }
   }
@@ -124,8 +148,11 @@ export class EncryptionService {
     try {
       const decrypted = this.decrypt(encryptedText);
       return JSON.parse(decrypted) as T;
-    } catch (error) {
-      this.logger.error('Error decrypting object', error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error decrypting object',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new Error('Failed to decrypt object');
     }
   }

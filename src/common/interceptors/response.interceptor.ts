@@ -41,7 +41,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<
     const timestamp = new Date().toISOString();
 
     return next.handle().pipe(
-      map((responseData) => {
+      map((responseData: unknown) => {
         // Caso 1: Respuesta null o undefined
         if (responseData === null || responseData === undefined) {
           return {
@@ -55,8 +55,9 @@ export class ResponseInterceptor<T> implements NestInterceptor<
 
         // Caso 2: Ya tiene el formato completo (incluye success: true)
         if (this.isAlreadyFormatted(responseData)) {
+          const formatted = responseData as ApiSuccessResponse<T>;
           return {
-            ...responseData,
+            ...formatted,
             success: true as const,
             timestamp,
             path,
@@ -65,13 +66,18 @@ export class ResponseInterceptor<T> implements NestInterceptor<
 
         // Caso 3: Formato parcial con { data, message } o { data, pagination }
         if (this.isPartiallyFormatted(responseData)) {
+          const partial = responseData as {
+            data: T;
+            message?: string;
+            pagination?: Record<string, unknown>;
+          };
           return {
             success: true as const,
-            data: responseData.data,
-            ...(responseData.pagination && {
-              pagination: responseData.pagination,
+            data: partial.data,
+            ...(partial.pagination && {
+              pagination: partial.pagination,
             }),
-            message: responseData.message || 'Operación realizada exitosamente',
+            message: partial.message || 'Operación realizada exitosamente',
             timestamp,
             path,
           };
@@ -80,7 +86,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<
         // Caso 4: Respuesta raw (objeto, array, primitivo)
         return {
           success: true as const,
-          data: responseData,
+          data: responseData as T,
           message: this.getDefaultMessage(request.method),
           timestamp,
           path,
@@ -92,12 +98,12 @@ export class ResponseInterceptor<T> implements NestInterceptor<
   /**
    * Verifica si la respuesta ya tiene el formato completo
    */
-  private isAlreadyFormatted(data: any): boolean {
+  private isAlreadyFormatted(data: unknown): boolean {
     return (
-      data &&
+      data !== null &&
       typeof data === 'object' &&
       'success' in data &&
-      data.success === true &&
+      (data as Record<string, unknown>).success === true &&
       'data' in data
     );
   }
@@ -105,9 +111,12 @@ export class ResponseInterceptor<T> implements NestInterceptor<
   /**
    * Verifica si la respuesta tiene formato parcial { data, message? }
    */
-  private isPartiallyFormatted(data: any): boolean {
+  private isPartiallyFormatted(data: unknown): boolean {
     return (
-      data && typeof data === 'object' && 'data' in data && !('success' in data)
+      data !== null &&
+      typeof data === 'object' &&
+      'data' in data &&
+      !('success' in data)
     );
   }
 

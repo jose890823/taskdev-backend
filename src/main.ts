@@ -14,6 +14,11 @@ async function bootstrap() {
   });
 
   // ============================================
+  // SEGURIDAD - Trust Proxy (para req.ip correcto detrás de reverse proxy)
+  // ============================================
+  app.set('trust proxy', 1);
+
+  // ============================================
   // SEGURIDAD - Helmet (HTTP Headers)
   // ============================================
   app.use(
@@ -33,7 +38,11 @@ async function bootstrap() {
 
   // Configurar limite de tamano para body parser
   app.useBodyParser('json', { limit: '50mb' });
-  app.useBodyParser('urlencoded', { limit: '50mb', extended: true } as any);
+
+  app.useBodyParser('urlencoded', {
+    limit: '50mb',
+    extended: true,
+  } as Parameters<typeof app.useBodyParser>[1]);
 
   // Configurar servicio de archivos estaticos para uploads
   app.use('/uploads', express.static('uploads'));
@@ -53,18 +62,27 @@ async function bootstrap() {
   // ============================================
   // SEGURIDAD - CORS (Cross-Origin Resource Sharing)
   // ============================================
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3002',
-  ];
+  const isProduction = process.env.NODE_ENV === 'production';
+  const allowedOrigins: string[] = [];
 
-  // Produccion: agregar origenes desde CORS_ORIGIN (comma-separated)
+  // Solo incluir localhost en desarrollo
+  if (!isProduction) {
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:3002');
+  }
+
+  // Produccion: origenes SOLO desde CORS_ORIGIN (comma-separated)
   const corsOrigin = process.env.CORS_ORIGIN;
   if (corsOrigin) {
-    corsOrigin.split(',').forEach(o => {
+    corsOrigin.split(',').forEach((o) => {
       const trimmed = o.trim();
       if (trimmed) allowedOrigins.push(trimmed);
     });
+  }
+
+  if (isProduction && allowedOrigins.length === 0) {
+    logger.warn(
+      '⚠️  CORS_ORIGIN no configurado en producción — ningún origen externo será permitido',
+    );
   }
 
   app.enableCors({
@@ -99,28 +117,60 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  // Configurar Swagger
-  const config = new DocumentBuilder()
-    .setTitle('TaskHub API')
-    .setDescription('API de TaskHub - Gestion de Tareas y Proyectos')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Auth', 'Autenticacion y autorizacion')
-    .addTag('Users', 'Gestion de usuarios')
-    .addTag('Users - Profile', 'Perfil de usuario')
-    .addTag('Users - Admin', 'Administracion de usuarios')
-    .addTag('Security - Admin', 'Panel de seguridad (Super Admin)')
-    .build();
+  // Configurar Swagger (solo en desarrollo o si SWAGGER_ENABLED=true)
+  const swaggerEnabled =
+    !isProduction || process.env.SWAGGER_ENABLED === 'true';
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    customSiteTitle: 'TaskHub API Docs',
-    customfavIcon: '/favicon.ico',
-    customCss: '.swagger-ui .topbar { display: none }',
-  });
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('TaskHub API')
+      .setDescription('API de TaskHub - Gestion de Tareas y Proyectos')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Auth', 'Autenticacion y autorizacion')
+      .addTag('Users', 'Gestion de usuarios')
+      .addTag('Users - Profile', 'Perfil de usuario')
+      .addTag('Users - Admin', 'Administracion de usuarios')
+      .addTag('Security - Admin', 'Panel de seguridad (Super Admin)')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'TaskHub API Docs',
+      customfavIcon: '/favicon.ico',
+      customCss: '.swagger-ui .topbar { display: none }',
+    });
+  } else {
+    logger.log(
+      '📄 Swagger deshabilitado en producción (set SWAGGER_ENABLED=true para activar)',
+    );
+  }
+
+  // Habilitar graceful shutdown (cierra conexiones DB, Redis, etc.)
+  app.enableShutdownHooks();
 
   const port = process.env.PORT ?? 3001;
-  await app.listen(port);
+
+  try {
+    await app.listen(port);
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+      logger.warn(
+        `Puerto ${port} en uso — matando proceso anterior y reintentando...`,
+      );
+      const { execSync } = await import('child_process');
+      try {
+        execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+      } catch {
+        // fuser puede fallar si no hay proceso — ignorar
+      }
+      // Esperar a que el puerto se libere
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await app.listen(port);
+    } else {
+      throw error;
+    }
+  }
 
   logger.log(`Aplicacion corriendo en: http://localhost:${port}`);
   logger.log(`Documentacion Swagger en: http://localhost:${port}/api/docs`);

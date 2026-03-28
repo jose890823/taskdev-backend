@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThan, FindOptionsWhere } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
@@ -19,6 +24,7 @@ import {
   BroadcastAudience,
 } from '../dto';
 import { ErrorCodes } from '../../../common/dto';
+import { User } from '../../auth/entities/user.entity';
 
 @Injectable()
 export class NotificationsService {
@@ -29,6 +35,8 @@ export class NotificationsService {
     private readonly notificationRepository: Repository<Notification>,
     @InjectRepository(NotificationPreference)
     private readonly preferenceRepository: Repository<NotificationPreference>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @InjectQueue('notifications')
     private readonly notificationQueue: Queue,
   ) {}
@@ -94,20 +102,26 @@ export class NotificationsService {
   }
 
   /**
-   * Crea múltiples notificaciones (para broadcast)
+   * Crea múltiples notificaciones (para broadcast).
+   * Uses Promise.allSettled for parallelism while preserving per-user
+   * preference checks and email queueing from create().
    */
   async createMany(
     userIds: string[],
     data: Omit<CreateNotificationDto, 'userId'>,
   ): Promise<number> {
-    let created = 0;
+    const results = await Promise.allSettled(
+      userIds.map((userId) => this.create({ ...data, userId })),
+    );
 
-    for (const userId of userIds) {
-      const notification = await this.create({
-        ...data,
-        userId,
-      });
-      if (notification) created++;
+    let created = 0;
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) created++;
+      if (result.status === 'rejected') {
+        this.logger.warn(
+          `Error creando notificacion en batch: ${result.reason}`,
+        );
+      }
     }
 
     return created;
@@ -126,7 +140,12 @@ export class NotificationsService {
   ): Promise<{
     data: Notification[];
     unreadCount: number;
-    pagination: { total: number; page: number; limit: number; totalPages: number };
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     const { type, status, isRead, page = 1, limit = 20 } = query;
 
@@ -155,11 +174,11 @@ export class NotificationsService {
   }
 
   /**
-   * Obtener notificación por ID
+   * Obtener notificación por ID (filtrada por userId para evitar IDOR)
    */
-  async findById(id: string): Promise<Notification> {
+  async findById(id: string, userId: string): Promise<Notification> {
     const notification = await this.notificationRepository.findOne({
-      where: { id },
+      where: { id, userId },
     });
 
     if (!notification) {
@@ -488,13 +507,20 @@ export class NotificationsService {
       case BroadcastAudience.SPECIFIC_USERS:
         return dto.userIds || [];
 
-      case BroadcastAudience.ALL_USERS:
-        // TODO: implementar consulta a BD
-        return [];
+      case BroadcastAudience.ALL_USERS: {
+        const users = await this.userRepository
+          .createQueryBuilder('user')
+          .select('user.id')
+          .where('user.isActive = :isActive', { isActive: true })
+          .andWhere('user.deletedAt IS NULL')
+          .getMany();
+        return users.map((u) => u.id);
+      }
 
       case BroadcastAudience.ORGANIZATION_MEMBERS:
-        // TODO: implementar consulta a BD con organizationId
-        return [];
+        throw new NotImplementedException(
+          'Broadcast a miembros de organización aún no está implementado',
+        );
 
       default:
         return [];

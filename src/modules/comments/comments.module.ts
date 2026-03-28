@@ -7,10 +7,7 @@ import { CommentsController } from './comments.controller';
 import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Comment, TaskCommentRead]),
-    TasksModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Comment, TaskCommentRead]), TasksModule],
   controllers: [CommentsController],
   providers: [CommentsService],
   exports: [CommentsService],

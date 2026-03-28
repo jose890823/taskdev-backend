@@ -1,6 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEnum, IsOptional, IsString, IsUUID, MaxLength, IsDateString, IsInt, Min, ValidateIf,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  IsDateString,
+  IsInt,
+  Min,
+  ValidateIf,
   IsArray,
 } from 'class-validator';
 import { TaskPriority } from '../entities/task.entity';
@@ -22,9 +30,13 @@ export class UpdateTaskDto {
   @IsUUID('4')
   statusId?: string;
 
-  @ApiProperty({ required: false, nullable: true, description: 'UUID del usuario asignado (legacy, usar assignedToIds)' })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'UUID del usuario asignado (legacy, usar assignedToIds)',
+  })
   @IsOptional()
-  @ValidateIf((o) => o.assignedToId !== null)
+  @ValidateIf((o: UpdateTaskDto) => o.assignedToId !== null)
   @IsUUID('4', { message: 'assignedToId debe ser un UUID valido o null' })
   assignedToId?: string | null;
 
@@ -36,7 +48,10 @@ export class UpdateTaskDto {
   })
   @IsOptional()
   @IsArray({ message: 'assignedToIds debe ser un arreglo' })
-  @IsUUID('4', { each: true, message: 'Cada assignedToId debe ser un UUID valido' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Cada assignedToId debe ser un UUID valido',
+  })
   assignedToIds?: string[];
 
   @ApiProperty({ enum: TaskPriority, required: false })
@@ -46,19 +61,23 @@ export class UpdateTaskDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @ValidateIf((o) => o.scheduledDate !== null)
+  @ValidateIf((o: UpdateTaskDto) => o.scheduledDate !== null)
   @IsDateString({}, { message: 'scheduledDate debe ser una fecha valida' })
   scheduledDate?: string | null;
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @ValidateIf((o) => o.dueDate !== null)
+  @ValidateIf((o: UpdateTaskDto) => o.dueDate !== null)
   @IsDateString({}, { message: 'dueDate debe ser una fecha valida' })
   dueDate?: string | null;
 
-  @ApiProperty({ required: false, nullable: true, description: 'UUID del modulo de proyecto (null para quitar)' })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'UUID del modulo de proyecto (null para quitar)',
+  })
   @IsOptional()
-  @ValidateIf((o) => o.moduleId !== null)
+  @ValidateIf((o: UpdateTaskDto) => o.moduleId !== null)
   @IsUUID('4', { message: 'moduleId debe ser un UUID valido o null' })
   moduleId?: string | null;
 

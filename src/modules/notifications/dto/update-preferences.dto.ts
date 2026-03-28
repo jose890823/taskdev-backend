@@ -51,22 +51,34 @@ export class UpdatePreferencesDto {
   // PREFERENCIAS POR CATEGORÍA - IN-APP
   // ============================================
 
-  @ApiPropertyOptional({ example: true, description: 'Notificaciones de tareas' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Notificaciones de tareas',
+  })
   @IsOptional()
   @IsBoolean()
   inAppTasks?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Notificaciones de proyectos' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Notificaciones de proyectos',
+  })
   @IsOptional()
   @IsBoolean()
   inAppProjects?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Notificaciones de organizaciones' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Notificaciones de organizaciones',
+  })
   @IsOptional()
   @IsBoolean()
   inAppOrganizations?: boolean;
 
-  @ApiPropertyOptional({ example: true, description: 'Notificaciones de anuncios' })
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Notificaciones de anuncios',
+  })
   @IsOptional()
   @IsBoolean()
   inAppAnnouncements?: boolean;

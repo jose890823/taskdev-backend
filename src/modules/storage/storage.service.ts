@@ -317,19 +317,20 @@ export class StorageService implements OnModuleInit {
           : 'No se pudo verificar la conexión',
         responseTime,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const responseTime = Date.now() - startTime;
+      const message = error instanceof Error ? error.message : 'Unknown error';
 
       // Registrar error
       await this.configService.setValidationResult(
         providerType,
         false,
-        error.message || 'Unknown error',
+        message,
       );
 
       return {
         success: false,
-        message: error.message || 'Error al validar el proveedor',
+        message: message || 'Error al validar el proveedor',
         responseTime,
       };
     }

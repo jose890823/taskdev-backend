@@ -60,7 +60,7 @@ export class CacheInterceptor implements NestInterceptor {
 
     try {
       // Intentar obtener del cache
-      const cached = await this.cacheService.get<any>(cacheKey);
+      const cached = await this.cacheService.get<unknown>(cacheKey);
 
       if (cached !== null) {
         this.logger.debug(`Cache HIT: ${cacheKey}`);
@@ -68,25 +68,28 @@ export class CacheInterceptor implements NestInterceptor {
       }
 
       this.logger.debug(`Cache MISS: ${cacheKey}`);
-    } catch (error) {
+    } catch (error: unknown) {
       // Si falla la lectura del cache, continuar sin cache
-      this.logger.warn(
-        `Error al leer cache para "${cacheKey}": ${error.message}`,
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Error al leer cache para "${cacheKey}": ${msg}`);
       return next.handle();
     }
 
     // Cache miss: ejecutar handler y almacenar resultado
     return next.handle().pipe(
-      tap(async (response) => {
-        try {
-          await this.cacheService.set(cacheKey, response, ttl);
-          this.logger.debug(`Cache SET: ${cacheKey} (TTL: ${ttl}s)`);
-        } catch (error) {
-          this.logger.warn(
-            `Error al almacenar en cache "${cacheKey}": ${error.message}`,
-          );
-        }
+      tap((response: unknown) => {
+        // Fire-and-forget: store in cache without blocking the response stream
+        void this.cacheService
+          .set(cacheKey, response, ttl)
+          .then(() => {
+            this.logger.debug(`Cache SET: ${cacheKey} (TTL: ${ttl}s)`);
+          })
+          .catch((error: unknown) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+              `Error al almacenar en cache "${cacheKey}": ${msg}`,
+            );
+          });
       }),
     );
   }

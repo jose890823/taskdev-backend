@@ -1,5 +1,9 @@
 import {
-  Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -12,9 +16,26 @@ import { ProjectsService } from '../projects/projects.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { User } from '../auth/entities/user.entity';
 import { isUuid } from '../../common/utils/identifier.util';
-import { canCreateTask, canEditTask, canDeleteTask } from '../../common/utils/task-permissions.util';
+import {
+  canCreateTask,
+  canEditTask,
+  canDeleteTask,
+} from '../../common/utils/task-permissions.util';
 import { Comment } from '../comments/entities/comment.entity';
 import { TaskCommentRead } from '../comments/entities/task-comment-read.entity';
+
+export interface TaskAssigneeRef {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface TaskWithAssignees {
+  id: string;
+  assignees: TaskAssigneeRef[];
+  [key: string]: unknown;
+}
 
 @Injectable()
 export class TasksService {
@@ -36,12 +57,15 @@ export class TasksService {
     let statusId = dto.statusId;
 
     if (!statusId) {
-      const defaultStatus = await this.taskStatusesService.getDefaultStatus(dto.projectId || null);
+      const defaultStatus = await this.taskStatusesService.getDefaultStatus(
+        dto.projectId || null,
+      );
       statusId = defaultStatus?.id ?? undefined;
     }
 
     // Extract assignedToIds before saving
-    const assignedToIds = dto.assignedToIds || (dto.assignedToId ? [dto.assignedToId] : []);
+    const assignedToIds =
+      dto.assignedToIds || (dto.assignedToId ? [dto.assignedToId] : []);
 
     const task = this.taskRepository.create({
       ...dto,
@@ -75,27 +99,38 @@ export class TasksService {
     return task;
   }
 
-  async findAll(filters: {
-    projectId?: string;
-    projectIds?: string[];
-    organizationId?: string;
-    statusId?: string;
-    assignedToId?: string;
-    type?: TaskType;
-    page?: number;
-    limit?: number;
-  }, currentUserId?: string, isSuperAdmin = false): Promise<{ data: any[]; total: number }> {
+  async findAll(
+    filters: {
+      projectId?: string;
+      projectIds?: string[];
+      organizationId?: string;
+      statusId?: string;
+      assignedToId?: string;
+      type?: TaskType;
+      page?: number;
+      limit?: number;
+    },
+    currentUserId?: string,
+    isSuperAdmin = false,
+  ): Promise<{ data: any[]; total: number }> {
     const { page = 1, limit = 50, ...where } = filters;
-    const qb = this.taskRepository.createQueryBuilder('t')
+    const qb = this.taskRepository
+      .createQueryBuilder('t')
       .where('t.parentId IS NULL');
 
     if (where.projectIds && where.projectIds.length > 0) {
-      qb.andWhere('t.projectId IN (:...projectIds)', { projectIds: where.projectIds });
+      qb.andWhere('t.projectId IN (:...projectIds)', {
+        projectIds: where.projectIds,
+      });
     } else if (where.projectId) {
       qb.andWhere('t.projectId = :projectId', { projectId: where.projectId });
     }
-    if (where.organizationId) qb.andWhere('t.organizationId = :organizationId', { organizationId: where.organizationId });
-    if (where.statusId) qb.andWhere('t.statusId = :statusId', { statusId: where.statusId });
+    if (where.organizationId)
+      qb.andWhere('t.organizationId = :organizationId', {
+        organizationId: where.organizationId,
+      });
+    if (where.statusId)
+      qb.andWhere('t.statusId = :statusId', { statusId: where.statusId });
     if (where.assignedToId) {
       qb.andWhere(
         't.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :assignedUserId)',
@@ -105,7 +140,13 @@ export class TasksService {
     if (where.type) qb.andWhere('t.type = :type', { type: where.type });
 
     // Scope filtering: limit to user's accessible tasks when no project/org filter
-    if (!where.projectId && !(where.projectIds && where.projectIds.length > 0) && !where.organizationId && currentUserId && !isSuperAdmin) {
+    if (
+      !where.projectId &&
+      !(where.projectIds && where.projectIds.length > 0) &&
+      !where.organizationId &&
+      currentUserId &&
+      !isSuperAdmin
+    ) {
       qb.andWhere(
         '(t.createdById = :uid OR t.assignedToId = :uid OR t.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :uid) OR t.projectId IN (SELECT pm."projectId" FROM project_members pm WHERE pm."userId" = :uid))',
         { uid: currentUserId },
@@ -121,17 +162,28 @@ export class TasksService {
 
     if (tasks.length === 0) return { data: [], total };
 
-    const taskIds = tasks.map(t => t.id);
+    const taskIds = tasks.map((t) => t.id);
 
     // Batch query 1: assignees with user data
     const assignees = await this.taskAssigneeRepository
       .createQueryBuilder('ta')
       .leftJoinAndSelect('ta.user', 'u')
       .where('ta.taskId IN (:...taskIds)', { taskIds })
-      .select(['ta.id', 'ta.taskId', 'ta.userId', 'u.id', 'u.firstName', 'u.lastName', 'u.email'])
+      .select([
+        'ta.id',
+        'ta.taskId',
+        'ta.userId',
+        'u.id',
+        'u.firstName',
+        'u.lastName',
+        'u.email',
+      ])
       .getMany();
 
-    const assigneesByTask: Record<string, { id: string; firstName: string; lastName: string; email: string }[]> = {};
+    const assigneesByTask: Record<
+      string,
+      { id: string; firstName: string; lastName: string; email: string }[]
+    > = {};
     for (const a of assignees) {
       if (!assigneesByTask[a.taskId]) assigneesByTask[a.taskId] = [];
       if (a.user) {
@@ -176,7 +228,7 @@ export class TasksService {
     }
 
     // Batch query 4: unread comments (only if user is provided)
-    let unreadMap: Record<string, boolean> = {};
+    const unreadMap: Record<string, boolean> = {};
     if (currentUserId) {
       // Get user's last read timestamps
       const reads = await this.dataSource
@@ -202,7 +254,9 @@ export class TasksService {
       }
 
       // Batch check for tasks that have been read before: are there newer comments?
-      const readTaskIds = Object.keys(readMap).filter(tid => commentCountMap[tid]);
+      const readTaskIds = Object.keys(readMap).filter(
+        (tid) => commentCountMap[tid],
+      );
       if (readTaskIds.length > 0) {
         // Build a single batch query instead of N individual queries
         const conditions = readTaskIds.map((tid, i) => {
@@ -230,10 +284,17 @@ export class TasksService {
     }
 
     // Fallback: also hydrate assignedTo from legacy field for compatibility
-    const legacyAssigneeIds = [...new Set(
-      tasks.filter(t => t.assignedToId && !assigneesByTask[t.id]?.length).map(t => t.assignedToId!),
-    )];
-    let legacyAssigneeMap: Record<string, { id: string; firstName: string; lastName: string; email: string }> = {};
+    const legacyAssigneeIds = [
+      ...new Set(
+        tasks
+          .filter((t) => t.assignedToId && !assigneesByTask[t.id]?.length)
+          .map((t) => t.assignedToId!),
+      ),
+    ];
+    let legacyAssigneeMap: Record<
+      string,
+      { id: string; firstName: string; lastName: string; email: string }
+    > = {};
     if (legacyAssigneeIds.length > 0) {
       const users = await this.dataSource
         .getRepository(User)
@@ -241,18 +302,30 @@ export class TasksService {
         .select(['u.id', 'u.firstName', 'u.lastName', 'u.email'])
         .where('u.id IN (:...ids)', { ids: legacyAssigneeIds })
         .getMany();
-      legacyAssigneeMap = Object.fromEntries(users.map(u => [u.id, {
-        id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email,
-      }]));
+      legacyAssigneeMap = Object.fromEntries(
+        users.map((u) => [
+          u.id,
+          {
+            id: u.id,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            email: u.email,
+          },
+        ]),
+      );
     }
 
-    const data = tasks.map(task => {
+    const data = tasks.map((task) => {
       const taskAssignees = assigneesByTask[task.id] || [];
       return {
         ...task,
         assignees: taskAssignees,
         // Legacy compatibility
-        assignedTo: taskAssignees[0] || (task.assignedToId ? legacyAssigneeMap[task.assignedToId] || null : null),
+        assignedTo:
+          taskAssignees[0] ||
+          (task.assignedToId
+            ? legacyAssigneeMap[task.assignedToId] || null
+            : null),
         subtaskCount: subtaskCountMap[task.id] || 0,
         commentCount: commentCountMap[task.id] || 0,
         hasUnreadComments: !!unreadMap[task.id],
@@ -263,7 +336,8 @@ export class TasksService {
   }
 
   async findMyTasks(userId: string, type?: TaskType): Promise<any[]> {
-    const qb = this.taskRepository.createQueryBuilder('t')
+    const qb = this.taskRepository
+      .createQueryBuilder('t')
       .where(
         '(t.id IN (SELECT ta."taskId" FROM task_assignees ta WHERE ta."userId" = :userId) OR t.assignedToId = :userId OR t.createdById = :userId)',
         { userId },
@@ -272,11 +346,20 @@ export class TasksService {
 
     if (type) qb.andWhere('t.type = :type', { type });
 
-    const tasks = await qb.orderBy('t.position', 'ASC').addOrderBy('t.createdAt', 'DESC').getMany();
+    const tasks = await qb
+      .orderBy('t.position', 'ASC')
+      .addOrderBy('t.createdAt', 'DESC')
+      .getMany();
     return this.hydrateTasks(tasks);
   }
 
   async findDailyTasks(userId: string, date?: string): Promise<any[]> {
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException(
+        'Formato de fecha inválido. Use YYYY-MM-DD',
+      );
+    }
+
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const tasks = await this.taskRepository
@@ -296,16 +379,27 @@ export class TasksService {
   private async hydrateTasks(tasks: Task[]): Promise<any[]> {
     if (tasks.length === 0) return [];
 
-    const taskIds = tasks.map(t => t.id);
+    const taskIds = tasks.map((t) => t.id);
 
     const assignees = await this.taskAssigneeRepository
       .createQueryBuilder('ta')
       .leftJoinAndSelect('ta.user', 'u')
       .where('ta.taskId IN (:...taskIds)', { taskIds })
-      .select(['ta.id', 'ta.taskId', 'ta.userId', 'u.id', 'u.firstName', 'u.lastName', 'u.email'])
+      .select([
+        'ta.id',
+        'ta.taskId',
+        'ta.userId',
+        'u.id',
+        'u.firstName',
+        'u.lastName',
+        'u.email',
+      ])
       .getMany();
 
-    const assigneesByTask: Record<string, { id: string; firstName: string; lastName: string; email: string }[]> = {};
+    const assigneesByTask: Record<
+      string,
+      { id: string; firstName: string; lastName: string; email: string }[]
+    > = {};
     for (const a of assignees) {
       if (!assigneesByTask[a.taskId]) assigneesByTask[a.taskId] = [];
       if (a.user) {
@@ -318,7 +412,7 @@ export class TasksService {
       }
     }
 
-    return tasks.map(task => ({
+    return tasks.map((task) => ({
       ...task,
       assignees: assigneesByTask[task.id] || [],
       assignedTo: assigneesByTask[task.id]?.[0] || null,
@@ -326,13 +420,15 @@ export class TasksService {
   }
 
   async findById(identifier: string): Promise<Task> {
-    const where = isUuid(identifier) ? { id: identifier } : { systemCode: identifier };
+    const where = isUuid(identifier)
+      ? { id: identifier }
+      : { systemCode: identifier };
     const task = await this.taskRepository.findOne({ where });
     if (!task) throw new NotFoundException('Tarea no encontrada');
     return task;
   }
 
-  async findByIdWithAssignees(identifier: string): Promise<any> {
+  async findByIdWithAssignees(identifier: string): Promise<TaskWithAssignees> {
     const task = await this.findById(identifier);
     let assignees = await this.getTaskAssignees(task.id);
 
@@ -345,14 +441,25 @@ export class TasksService {
         .where('u.id = :id', { id: task.assignedToId })
         .getOne();
       if (user) {
-        assignees = [{ id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email }];
+        assignees = [
+          {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+          },
+        ];
       }
     }
 
     return { ...task, assignees };
   }
 
-  async update(identifier: string, dto: UpdateTaskDto, currentUser?: User): Promise<any> {
+  async update(
+    identifier: string,
+    dto: UpdateTaskDto,
+    currentUser?: User,
+  ): Promise<TaskWithAssignees> {
     const task = await this.findById(identifier);
     const id = task.id;
     const originalTitle = task.title;
@@ -361,16 +468,17 @@ export class TasksService {
     if (dto.statusId && dto.statusId !== task.statusId) {
       const newStatus = await this.taskStatusesService.findById(dto.statusId);
       if (newStatus.isCompleted) {
-        (task as any).completedAt = new Date();
+        task.completedAt = new Date();
       } else {
-        (task as any).completedAt = null;
+        task.completedAt = null;
       }
     }
 
     // Handle assignedToIds
-    const oldAssigneeIds = dto.assignedToIds !== undefined
-      ? (await this.getTaskAssignees(id)).map(a => a.id)
-      : [];
+    const oldAssigneeIds =
+      dto.assignedToIds !== undefined
+        ? (await this.getTaskAssignees(id)).map((a) => a.id)
+        : [];
 
     if (dto.assignedToIds !== undefined) {
       // Validate subtask restriction
@@ -378,8 +486,8 @@ export class TasksService {
         await this.validateSubtaskAssignees(task.parentId, dto.assignedToIds);
       }
       await this.saveAssignees(id, dto.assignedToIds);
-      // Sync legacy field
-      (dto as any).assignedToId = dto.assignedToIds[0] || null;
+      // Sync legacy field to keep single-assignee column in sync
+      dto.assignedToId = dto.assignedToIds[0] ?? null;
     }
 
     // Remove assignedToIds from dto before saving to task table
@@ -428,9 +536,11 @@ export class TasksService {
 
       // Emit task.status_changed / task.completed
       if (dto.statusId && dto.statusId !== oldStatusId) {
-        const assigneeIds = assignees.map(a => a.id);
+        const assigneeIds = assignees.map((a) => a.id);
         const [oldStatus, newStatus] = await Promise.all([
-          oldStatusId ? this.taskStatusesService.findById(oldStatusId).catch(() => null) : null,
+          oldStatusId
+            ? this.taskStatusesService.findById(oldStatusId).catch(() => null)
+            : null,
           this.taskStatusesService.findById(dto.statusId),
         ]);
 
@@ -476,7 +586,7 @@ export class TasksService {
     if (subtasks.length === 0) return [];
 
     // Hydrate assignees for subtasks
-    const subtaskIds = subtasks.map(s => s.id);
+    const subtaskIds = subtasks.map((s) => s.id);
     const assignees = await this.taskAssigneeRepository.find({
       where: { taskId: In(subtaskIds) },
       relations: ['user'],
@@ -495,28 +605,37 @@ export class TasksService {
       }
     }
 
-    return subtasks.map(sub => ({
+    return subtasks.map((sub) => ({
       ...sub,
       assignees: assigneesByTask[sub.id] || [],
     }));
   }
 
-  async createSubtask(identifier: string, dto: CreateTaskDto, user: User): Promise<Task> {
+  async createSubtask(
+    identifier: string,
+    dto: CreateTaskDto,
+    user: User,
+  ): Promise<Task> {
     const parent = await this.findById(identifier);
     const parentId = parent.id;
 
     // Validate subtask assignees
-    const assignedToIds = dto.assignedToIds || (dto.assignedToId ? [dto.assignedToId] : []);
+    const assignedToIds =
+      dto.assignedToIds || (dto.assignedToId ? [dto.assignedToId] : []);
     if (assignedToIds.length > 0) {
       await this.validateSubtaskAssignees(parentId, assignedToIds);
     }
 
-    const subtask = await this.create({
-      ...dto,
-      parentId,
-      projectId: dto.projectId ?? parent.projectId ?? undefined,
-      organizationId: dto.organizationId ?? parent.organizationId ?? undefined,
-    }, user);
+    const subtask = await this.create(
+      {
+        ...dto,
+        parentId,
+        projectId: dto.projectId ?? parent.projectId ?? undefined,
+        organizationId:
+          dto.organizationId ?? parent.organizationId ?? undefined,
+      },
+      user,
+    );
 
     // Emit subtask.created to parent task assignees
     const parentAssignees = await this.getTaskAssignees(parentId);
@@ -528,14 +647,30 @@ export class TasksService {
         taskPriority: subtask.priority,
         createdByName: `${user.firstName} ${user.lastName}`,
         createdById: user.id,
-        assigneeIds: parentAssignees.map(a => a.id),
+        assigneeIds: parentAssignees.map((a) => a.id),
       });
     }
 
     return subtask;
   }
 
-  async bulkUpdatePositions(items: BulkPositionItemDto[]): Promise<{ updated: number }> {
+  async bulkUpdatePositions(
+    items: BulkPositionItemDto[],
+  ): Promise<{ updated: number }> {
+    // Batch-load all unique statuses BEFORE the transaction loop (avoids N+1)
+    const uniqueStatusIds = [
+      ...new Set(items.filter((i) => i.statusId).map((i) => i.statusId!)),
+    ];
+    const statusMap = new Map<
+      string,
+      import('../task-statuses/entities/task-status.entity').TaskStatus
+    >();
+    if (uniqueStatusIds.length > 0) {
+      const statuses =
+        await this.taskStatusesService.findByIds(uniqueStatusIds);
+      statuses.forEach((s) => statusMap.set(s.id, s));
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -547,7 +682,12 @@ export class TasksService {
 
         if (item.statusId) {
           updateData.statusId = item.statusId;
-          const newStatus = await this.taskStatusesService.findById(item.statusId);
+          const newStatus = statusMap.get(item.statusId);
+          if (!newStatus) {
+            throw new NotFoundException(
+              `Estado no encontrado: ${item.statusId}`,
+            );
+          }
           updateData.completedAt = newStatus.isCompleted ? new Date() : null;
         }
 
@@ -566,46 +706,132 @@ export class TasksService {
     }
   }
 
+  /**
+   * Batch-verify edit access for multiple task IDs.
+   * Loads all tasks in ONE query, verifies they belong to the same project,
+   * and checks user's project membership ONCE.
+   */
+  async verifyBulkEditAccess(
+    taskIds: string[],
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
+    if (isSuperAdmin || taskIds.length === 0) return;
+
+    const tasks = await this.taskRepository.findBy({ id: In(taskIds) });
+    if (tasks.length !== taskIds.length) {
+      const foundIds = new Set(tasks.map((t) => t.id));
+      const missing = taskIds.find((id) => !foundIds.has(id));
+      throw new NotFoundException(`Tarea no encontrada: ${missing}`);
+    }
+
+    // Group by projectId to check access per project (bulk ops usually share one)
+    const projectIds = [
+      ...new Set(tasks.map((t) => t.projectId).filter(Boolean)),
+    ] as string[];
+
+    // For tasks without projectId, verify creator
+    const personalTasks = tasks.filter((t) => !t.projectId);
+    for (const task of personalTasks) {
+      if (task.createdById !== userId) {
+        throw new ForbiddenException('No tienes acceso a esta tarea');
+      }
+    }
+
+    // For project tasks, check membership + edit permission ONCE per project
+    for (const projectId of projectIds) {
+      const role = await this.projectsService.getMemberRole(projectId, userId);
+      const projectTasks = tasks.filter((t) => t.projectId === projectId);
+      for (const task of projectTasks) {
+        const isCreator = task.createdById === userId;
+        if (!canEditTask(role, isCreator)) {
+          throw new ForbiddenException(
+            'No tienes permisos para editar esta tarea',
+          );
+        }
+      }
+    }
+  }
+
   // ── Access verification ──
 
-  async verifyTaskAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+  async verifyTaskAccess(
+    taskId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<Task> {
     const task = await this.findById(taskId);
     if (isSuperAdmin) return task;
     if (task.createdById === userId) return task;
     if (task.assignedToId === userId) return task;
-    const isAssignee = await this.taskAssigneeRepository.findOne({ where: { taskId: task.id, userId } });
+    const isAssignee = await this.taskAssigneeRepository.findOne({
+      where: { taskId: task.id, userId },
+    });
     if (isAssignee) return task;
     if (task.projectId) {
-      const isMember = await this.projectsService.isMember(task.projectId, userId);
+      const isMember = await this.projectsService.isMember(
+        task.projectId,
+        userId,
+      );
       if (isMember) return task;
     }
     throw new ForbiddenException('No tienes acceso a esta tarea');
   }
 
-  async verifyProjectAccess(projectId: string, userId: string, isSuperAdmin = false): Promise<void> {
-    await this.projectsService.verifyMemberAccess(projectId, userId, isSuperAdmin);
+  async verifyProjectAccess(
+    projectId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
+    await this.projectsService.verifyMemberAccess(
+      projectId,
+      userId,
+      isSuperAdmin,
+    );
   }
 
-  async verifyOrganizationAccess(organizationId: string, userId: string, isSuperAdmin = false): Promise<void> {
-    await this.organizationsService.verifyMemberAccess(organizationId, userId, isSuperAdmin);
+  async verifyOrganizationAccess(
+    organizationId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
+    await this.organizationsService.verifyMemberAccess(
+      organizationId,
+      userId,
+      isSuperAdmin,
+    );
   }
 
-  async verifyTaskCreateAccess(projectId: string | null, userId: string, isSuperAdmin = false): Promise<void> {
+  async verifyTaskCreateAccess(
+    projectId: string | null,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
     if (isSuperAdmin || !projectId) return;
     const role = await this.projectsService.getMemberRole(projectId, userId);
     if (!canCreateTask(role)) {
-      throw new ForbiddenException('No tienes permisos para crear tareas en este proyecto');
+      throw new ForbiddenException(
+        'No tienes permisos para crear tareas en este proyecto',
+      );
     }
   }
 
-  async verifyTaskEditAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+  async verifyTaskEditAccess(
+    taskId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<Task> {
     const task = await this.findById(taskId);
     if (isSuperAdmin) return task;
     if (!task.projectId) {
-      if (task.createdById !== userId) throw new ForbiddenException('No tienes acceso a esta tarea');
+      if (task.createdById !== userId)
+        throw new ForbiddenException('No tienes acceso a esta tarea');
       return task;
     }
-    const role = await this.projectsService.getMemberRole(task.projectId, userId);
+    const role = await this.projectsService.getMemberRole(
+      task.projectId,
+      userId,
+    );
     const isCreator = task.createdById === userId;
     if (!canEditTask(role, isCreator)) {
       throw new ForbiddenException('No tienes permisos para editar esta tarea');
@@ -613,31 +839,45 @@ export class TasksService {
     return task;
   }
 
-  async verifyTaskDeleteAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<Task> {
+  async verifyTaskDeleteAccess(
+    taskId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<Task> {
     const task = await this.findById(taskId);
     if (isSuperAdmin) return task;
     if (!task.projectId) {
-      if (task.createdById !== userId) throw new ForbiddenException('No tienes acceso a esta tarea');
+      if (task.createdById !== userId)
+        throw new ForbiddenException('No tienes acceso a esta tarea');
       return task;
     }
-    const role = await this.projectsService.getMemberRole(task.projectId, userId);
+    const role = await this.projectsService.getMemberRole(
+      task.projectId,
+      userId,
+    );
     if (!canDeleteTask(role)) {
-      throw new ForbiddenException('No tienes permisos para eliminar tareas en este proyecto');
+      throw new ForbiddenException(
+        'No tienes permisos para eliminar tareas en este proyecto',
+      );
     }
     return task;
   }
 
   // ── Helpers ──
 
-  async getTaskAssignees(taskId: string): Promise<{ id: string; firstName: string; lastName: string; email: string }[]> {
+  async getTaskAssignees(
+    taskId: string,
+  ): Promise<
+    { id: string; firstName: string; lastName: string; email: string }[]
+  > {
     const assignees = await this.taskAssigneeRepository.find({
       where: { taskId },
       relations: ['user'],
     });
 
     return assignees
-      .filter(a => a.user)
-      .map(a => ({
+      .filter((a) => a.user)
+      .map((a) => ({
         id: a.user!.id,
         firstName: a.user!.firstName,
         lastName: a.user!.lastName,
@@ -645,19 +885,25 @@ export class TasksService {
       }));
   }
 
-  private async saveAssignees(taskId: string, userIds: string[]): Promise<void> {
+  private async saveAssignees(
+    taskId: string,
+    userIds: string[],
+  ): Promise<void> {
     // Delete existing and re-insert
     await this.taskAssigneeRepository.delete({ taskId });
 
     if (userIds.length > 0) {
-      const entities = userIds.map(userId =>
+      const entities = userIds.map((userId) =>
         this.taskAssigneeRepository.create({ taskId, userId }),
       );
       await this.taskAssigneeRepository.save(entities);
     }
   }
 
-  private async validateSubtaskAssignees(parentId: string, assigneeIds: string[]): Promise<void> {
+  private async validateSubtaskAssignees(
+    parentId: string,
+    assigneeIds: string[],
+  ): Promise<void> {
     if (assigneeIds.length === 0) return;
 
     const parentAssignees = await this.taskAssigneeRepository.find({
@@ -667,8 +913,8 @@ export class TasksService {
     // If parent has no assignees, allow any assignment
     if (parentAssignees.length === 0) return;
 
-    const parentUserIds = new Set(parentAssignees.map(a => a.userId));
-    const invalid = assigneeIds.filter(id => !parentUserIds.has(id));
+    const parentUserIds = new Set(parentAssignees.map((a) => a.userId));
+    const invalid = assigneeIds.filter((id) => !parentUserIds.has(id));
 
     if (invalid.length > 0) {
       throw new BadRequestException(

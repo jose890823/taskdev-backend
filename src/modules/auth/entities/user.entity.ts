@@ -98,10 +98,7 @@ export class User {
    */
   get role(): UserRole {
     if (!this.roles || this.roles.length === 0) return UserRole.USER;
-    const hierarchy = [
-      UserRole.SUPER_ADMIN,
-      UserRole.USER,
-    ];
+    const hierarchy = [UserRole.SUPER_ADMIN, UserRole.USER];
     for (const role of hierarchy) {
       if (this.roles.includes(role)) return role;
     }

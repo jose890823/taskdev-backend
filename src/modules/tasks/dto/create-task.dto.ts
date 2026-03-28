@@ -1,12 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  IsDateString,
   IsArray,
 } from 'class-validator';
 import { TaskType, TaskPriority } from '../entities/task.entity';
 
 export class CreateTaskDto {
-  @ApiProperty({ example: 'Implementar login', description: 'Titulo de la tarea' })
+  @ApiProperty({
+    example: 'Implementar login',
+    description: 'Titulo de la tarea',
+  })
   @IsNotEmpty({ message: 'El titulo es obligatorio' })
   @IsString()
   @MaxLength(500)
@@ -42,7 +51,10 @@ export class CreateTaskDto {
   @IsUUID('4')
   statusId?: string;
 
-  @ApiProperty({ required: false, description: 'UUID del usuario asignado (legacy, usar assignedToIds)' })
+  @ApiProperty({
+    required: false,
+    description: 'UUID del usuario asignado (legacy, usar assignedToIds)',
+  })
   @IsOptional()
   @IsUUID('4')
   assignedToId?: string;
@@ -55,7 +67,10 @@ export class CreateTaskDto {
   })
   @IsOptional()
   @IsArray({ message: 'assignedToIds debe ser un arreglo' })
-  @IsUUID('4', { each: true, message: 'Cada assignedToId debe ser un UUID valido' })
+  @IsUUID('4', {
+    each: true,
+    message: 'Cada assignedToId debe ser un UUID valido',
+  })
   assignedToIds?: string[];
 
   @ApiProperty({ required: false })

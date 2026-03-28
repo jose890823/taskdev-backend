@@ -17,20 +17,23 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 
 // Importación condicional del EmailModule
+
 let EmailModule: any = null;
+
 let EmailService: any = null;
 
 const emailModulePath = join(__dirname, '../email/email.module');
-const emailServicePath = join(__dirname, '../email/email.service');
 
 if (
   existsSync(emailModulePath + '.ts') ||
   existsSync(emailModulePath + '.js')
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- conditional require for optional module
     EmailModule = require('../email/email.module').EmailModule;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- conditional require for optional module
     EmailService = require('../email/email.service').EmailService;
-  } catch (error) {
+  } catch {
     // EmailModule no disponible
   }
 }
@@ -66,15 +69,24 @@ if (
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'default-secret',
-        signOptions: {
-          expiresIn: configService.get('JWT_EXPIRATION') || '15m',
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret && configService.get('NODE_ENV') === 'production') {
+          throw new Error(
+            'JWT_SECRET is required in production. Set it in your environment variables.',
+          );
+        }
+        return {
+          secret: secret || 'dev-only-secret-do-not-use-in-prod',
+          signOptions: {
+            expiresIn: configService.get('JWT_EXPIRATION') || '15m',
+          },
+        };
+      },
     }),
 
     // EmailModule opcional - solo si existe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- spreading optional dynamic module
     ...(EmailModule ? [EmailModule] : []),
 
     // UsersModule para el servicio de actividades
@@ -95,10 +107,12 @@ if (
       useClass: JwtAuthGuard,
     },
     // Provider condicional para EmailService
+
     ...(EmailService
       ? [
           {
             provide: 'EmailService',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- dynamic EmailService token
             useExisting: EmailService,
           },
         ]

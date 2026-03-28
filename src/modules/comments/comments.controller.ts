@@ -1,5 +1,12 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, ParseUUIDPipe,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
@@ -16,7 +23,12 @@ export class CommentsController {
   @Post()
   @ApiOperation({ summary: 'Crear comentario' })
   async create(@Body() dto: CreateCommentDto, @CurrentUser() user: User) {
-    await this.commentsService.verifyTaskAccess(dto.taskId, user.id, user.isSuperAdmin());
+    await this.commentsService.verifyTaskAccess(
+      dto.taskId,
+      user.id,
+      user.isSuperAdmin(),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- CommentsService.create is typed as Promise<any> (to-do: improve service types)
     return this.commentsService.create(dto, user);
   }
 
@@ -26,7 +38,11 @@ export class CommentsController {
     @Param('taskId', ParseUUIDPipe) taskId: string,
     @CurrentUser() user: User,
   ) {
-    await this.commentsService.verifyTaskAccess(taskId, user.id, user.isSuperAdmin());
+    await this.commentsService.verifyTaskAccess(
+      taskId,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.commentsService.findByTask(taskId, user.id);
   }
 
@@ -42,7 +58,10 @@ export class CommentsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar comentario' })
-  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
     await this.commentsService.remove(id, user.id);
     return { message: 'Comentario eliminado' };
   }

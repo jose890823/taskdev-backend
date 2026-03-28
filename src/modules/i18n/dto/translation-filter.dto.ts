@@ -31,7 +31,7 @@ export class TranslationFilterDto {
     required: false,
   })
   @IsOptional()
-  @IsEnum(['es', 'en'] as any, {
+  @IsEnum(['es', 'en'] as string[], {
     message: 'El idioma debe ser uno de: es, en',
   })
   locale?: TranslationLocale;
@@ -80,7 +80,7 @@ export class TranslationFilterDto {
       'common',
       'errors',
       'emails',
-    ] as any,
+    ] as string[],
     {
       message:
         'El modulo debe ser uno de: auth, users, stores, products, orders, cart, payments, shipping, notifications, coupons, reviews, disputes, wishlist, commissions, common, errors, emails',
@@ -103,10 +103,10 @@ export class TranslationFilterDto {
     required: false,
   })
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (value === 'true') return true;
     if (value === 'false') return false;
-    return value;
+    return value as boolean;
   })
   @IsBoolean({
     message: 'El filtro isSystem debe ser un valor booleano',

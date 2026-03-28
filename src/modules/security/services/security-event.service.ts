@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Repository, Between, MoreThanOrEqual } from 'typeorm';
 import {
   SecurityEvent,
   SecurityEventType,
@@ -90,7 +90,12 @@ export class SecurityEventService {
    */
   async findAll(filter: SecurityEventFilterDto): Promise<{
     data: SecurityEvent[];
-    pagination: { total: number; page: number; limit: number; totalPages: number };
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     const queryBuilder =
       this.securityEventRepository.createQueryBuilder('event');

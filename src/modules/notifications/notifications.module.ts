@@ -4,7 +4,11 @@ import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 // Entities
-import { Notification, NotificationPreference, NotificationEventConfig } from './entities';
+import {
+  Notification,
+  NotificationPreference,
+  NotificationEventConfig,
+} from './entities';
 import { User } from '../auth/entities/user.entity';
 
 // Services
@@ -32,7 +36,12 @@ import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Notification, NotificationPreference, NotificationEventConfig, User]),
+    TypeOrmModule.forFeature([
+      Notification,
+      NotificationPreference,
+      NotificationEventConfig,
+      User,
+    ]),
     BullModule.registerQueueAsync({
       name: 'notifications',
       imports: [ConfigModule],

@@ -93,30 +93,32 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
 
       // Si la respuesta es un objeto
-      const responseObj = exceptionResponse as Record<string, any>;
+      const responseObj = exceptionResponse as Record<string, unknown>;
 
       // Extraer código de error (prioridad: code > error > statusCode)
       const code =
-        responseObj.code ||
-        responseObj.error ||
+        (responseObj.code as string) ||
+        (responseObj.error as string) ||
         STATUS_TO_ERROR_CODE[status] ||
         'HTTP_ERROR';
 
       // Extraer mensaje (manejar arrays de validación)
-      let message = responseObj.message;
-      if (Array.isArray(message)) {
-        message = message.join('. ');
+      let message: string;
+      const rawMessage = responseObj.message;
+      if (Array.isArray(rawMessage)) {
+        message = rawMessage.join('. ');
+      } else {
+        message =
+          (rawMessage as string) ||
+          exception.message ||
+          'Error en la solicitud';
       }
-      message = message || exception.message || 'Error en la solicitud';
 
       // Extraer detalles adicionales (excluir campos ya procesados)
-      const {
-        code: _,
-        message: __,
-        error: ___,
-        statusCode: ____,
-        ...rest
-      } = responseObj;
+      const excludedKeys = new Set(['code', 'message', 'error', 'statusCode']);
+      const rest = Object.fromEntries(
+        Object.entries(responseObj).filter(([key]) => !excludedKeys.has(key)),
+      );
       const details = Object.keys(rest).length > 0 ? rest : null;
 
       return { status, code, message, details };

@@ -1,4 +1,8 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -22,7 +26,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ]);
 
     if (isPublic) {
-      const request = context.switchToHttp().getRequest();
+      const request = context
+        .switchToHttp()
+        .getRequest<{ headers: Record<string, string | undefined> }>();
       const authHeader = request.headers?.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         // Token present on public route — run Passport pipeline to attach user
@@ -34,7 +40,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+  handleRequest<TUser = unknown>(
+    err: Error | null,
+    user: TUser | false,
+    _info: unknown,
+    context: ExecutionContext,
+  ): TUser {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -42,13 +53,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     if (isPublic) {
       // On public routes, return whatever user we got (or null) — never throw
-      return user || null;
+      return (user || null) as TUser;
     }
 
     // On protected routes, throw if no valid user
     if (err || !user) {
-      throw err || new UnauthorizedException('Token de acceso inválido o expirado');
+      throw (
+        err || new UnauthorizedException('Token de acceso inválido o expirado')
+      );
     }
-    return user;
+    return user as TUser;
   }
 }

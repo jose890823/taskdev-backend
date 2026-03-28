@@ -13,23 +13,31 @@ import { DataSource } from 'typeorm';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
+
+      useFactory: (configService: ConfigService) => {
         const logger = new Logger('DatabaseModule');
 
         try {
-          // TYPEORM_SYNC permite forzar sincronización en producción (usar solo para crear tablas inicialmente)
+          // Sincronización: NUNCA en producción a menos que se confirme explícitamente
+          const isProduction = configService.get('NODE_ENV') === 'production';
           const forceSync =
             configService.get('TYPEORM_SYNC', 'false') === 'true';
-          const isProduction = configService.get('NODE_ENV') === 'production';
-          const shouldSync = forceSync || !isProduction;
+          const forceSyncConfirm =
+            configService.get('TYPEORM_SYNC_CONFIRM', 'false') ===
+            'I_KNOW_WHAT_I_AM_DOING';
+
+          // En producción: requiere TYPEORM_SYNC=true + TYPEORM_SYNC_CONFIRM=I_KNOW_WHAT_I_AM_DOING
+          const shouldSync = isProduction
+            ? forceSync && forceSyncConfirm
+            : forceSync || true;
 
           const dbConfig = {
             type: 'postgres' as const,
-            host: configService.get('DB_HOST', 'localhost'),
-            port: configService.get('DB_PORT', 5432),
-            username: configService.get('DB_USERNAME', 'postgres'),
-            password: configService.get('DB_PASSWORD', 'postgres'),
-            database: configService.get('DB_NAME', 'modular_base'),
+            host: configService.get<string>('DB_HOST', 'localhost'),
+            port: configService.get<number>('DB_PORT', 5432),
+            username: configService.get<string>('DB_USERNAME', 'postgres'),
+            password: configService.get<string>('DB_PASSWORD', 'postgres'),
+            database: configService.get<string>('DB_NAME', 'modular_base'),
             entities: [__dirname + '/../**/*.entity{.ts,.js}'],
             synchronize: shouldSync,
             logging: configService.get('NODE_ENV') === 'development',
@@ -37,9 +45,15 @@ import { DataSource } from 'typeorm';
             retryDelay: 3000,
           };
 
-          if (forceSync && isProduction) {
+          if (isProduction && forceSync && !forceSyncConfirm) {
+            logger.error(
+              '❌ TYPEORM_SYNC=true en producción IGNORADO — se requiere TYPEORM_SYNC_CONFIRM=I_KNOW_WHAT_I_AM_DOING para activar',
+            );
+          }
+
+          if (shouldSync && isProduction) {
             logger.warn(
-              '⚠️  TYPEORM_SYNC=true en producción - Las tablas se sincronizarán automáticamente',
+              '⚠️  TYPEORM_SYNC activo en producción — Las tablas se sincronizarán automáticamente',
             );
             logger.warn(
               '⚠️  RECUERDA desactivar TYPEORM_SYNC después de crear las tablas',
@@ -51,11 +65,13 @@ import { DataSource } from 'typeorm';
           logger.log(`📊 Database: ${dbConfig.database}`);
 
           return dbConfig;
-        } catch (error) {
+        } catch (error: unknown) {
           logger.warn(
             '⚠️  PostgreSQL no disponible, usando fallback in-memory',
           );
-          logger.error(`Error: ${error.message}`);
+          logger.error(
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+          );
 
           // Retornar configuración básica que permita el módulo cargar
           return {
@@ -90,9 +106,9 @@ export class DatabaseModule implements OnModuleInit {
       // Crear extensión uuid-ossp si no existe
       await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
       DatabaseModule.logger.log('✅ Extensión uuid-ossp verificada/creada');
-    } catch (error) {
+    } catch (error: unknown) {
       DatabaseModule.logger.warn(
-        `⚠️ No se pudo crear extensión uuid-ossp: ${error.message}`,
+        `⚠️ No se pudo crear extensión uuid-ossp: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

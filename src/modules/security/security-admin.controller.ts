@@ -33,7 +33,7 @@ import { ActiveSessionService } from './services/active-session.service';
 import { SecurityAlertService } from './services/security-alert.service';
 
 import { SecurityEventFilterDto } from './dto/security-event-filter.dto';
-import { BlockIpDto, UnblockIpDto } from './dto/block-ip.dto';
+import { BlockIpDto } from './dto/block-ip.dto';
 import {
   UpdateSecurityConfigDto,
   CreateSecurityConfigDto,
@@ -43,6 +43,10 @@ import {
   AssignAlertDto,
   ReviewEventDto,
 } from './dto/update-alert.dto';
+import {
+  SecurityAlertStatus,
+  SecurityAlertSeverity,
+} from './entities/security-alert.entity';
 
 @ApiTags('Security - Admin')
 @Controller('admin/security')
@@ -336,8 +340,8 @@ export class SecurityAdminController {
     @Query('offset') offset?: number,
   ) {
     return this.securityAlertService.findAll({
-      status: status as any,
-      severity: severity as any,
+      status: status as SecurityAlertStatus | undefined,
+      severity: severity as SecurityAlertSeverity | undefined,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
     });

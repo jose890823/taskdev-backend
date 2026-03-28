@@ -5,6 +5,7 @@ import {
   Bucket,
   File,
   GetSignedUrlConfig,
+  PredefinedAcl,
 } from '@google-cloud/storage';
 import * as crypto from 'crypto';
 import {
@@ -35,13 +36,18 @@ export class GCSStorageProvider implements IStorageProvider {
   /**
    * Inicializar el proveedor con su configuración
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- GCS Storage constructor is synchronous; async keeps interface contract
   async initialize(providerConfig: StorageProviderConfig): Promise<void> {
     const config = providerConfig.config as GCSConfig;
 
     this.bucketName = config.bucket;
     this.defaultExpiration = providerConfig.settings?.urlExpiration || 3600;
 
-    const storageOptions: any = {
+    const storageOptions: {
+      projectId: string;
+      keyFilename?: string;
+      credentials?: { client_email: string; private_key: string };
+    } = {
       projectId: config.projectId,
     };
 
@@ -76,7 +82,11 @@ export class GCSStorageProvider implements IStorageProvider {
 
     const gcsFile = this.bucket!.file(key);
 
-    const uploadOptions: any = {
+    const uploadOptions: {
+      metadata: { contentType: string; metadata?: Record<string, string> };
+      resumable: boolean;
+      predefinedAcl?: PredefinedAcl;
+    } = {
       metadata: {
         contentType: options.mimeType || 'application/octet-stream',
         metadata: options.metadata,
@@ -130,6 +140,7 @@ export class GCSStorageProvider implements IStorageProvider {
   /**
    * Obtener un stream de lectura del archivo
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- createReadStream is synchronous; async keeps interface contract
   async getReadStream(filePath: string): Promise<Readable> {
     this.ensureInitialized();
 
@@ -152,8 +163,8 @@ export class GCSStorageProvider implements IStorageProvider {
       await gcsFile.delete();
       this.logger.log(`File deleted from GCS: ${key}`);
       return true;
-    } catch (error: any) {
-      if (error.code === 404) {
+    } catch (error: unknown) {
+      if ((error as Record<string, unknown>).code === 404) {
         return false;
       }
       throw error;
@@ -322,7 +333,11 @@ export class GCSStorageProvider implements IStorageProvider {
     const prefix = this.normalizeKey(dirPath);
     const files: FileMetadata[] = [];
 
-    const listOptions: any = {
+    const listOptions: {
+      prefix?: string;
+      maxResults: number;
+      delimiter?: string;
+    } = {
       prefix: prefix ? `${prefix}/` : undefined,
       maxResults: options?.limit || 1000,
     };
@@ -372,6 +387,7 @@ export class GCSStorageProvider implements IStorageProvider {
   /**
    * Obtener información del espacio usado
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- GCS has no native usage API; async keeps interface contract
   async getUsageInfo(): Promise<{
     used: number;
     total?: number;
@@ -422,9 +438,13 @@ export class GCSStorageProvider implements IStorageProvider {
   private uploadStream(
     stream: Readable,
     gcsFile: File,
-    options: any,
+    options: {
+      metadata: { contentType: string; metadata?: Record<string, string> };
+      resumable: boolean;
+      predefinedAcl?: PredefinedAcl;
+    },
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const writeStream = gcsFile.createWriteStream(options);
       stream.pipe(writeStream).on('finish', resolve).on('error', reject);
     });

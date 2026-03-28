@@ -27,7 +27,7 @@ export class UpdateTranslationDto {
     required: false,
   })
   @IsOptional()
-  @IsEnum(['es', 'en'] as any, {
+  @IsEnum(['es', 'en'] as string[], {
     message: 'El idioma debe ser uno de: es, en',
   })
   locale?: TranslationLocale;

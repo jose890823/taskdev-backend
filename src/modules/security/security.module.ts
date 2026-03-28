@@ -63,7 +63,7 @@ import { SecurityAdminController } from './security-admin.controller';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: (_configService: ConfigService) => ({
         throttlers: [
           {
             name: 'short',

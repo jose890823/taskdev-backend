@@ -11,6 +11,15 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserRole } from './entities/user.entity';
 
+/** Helper to create a mock Express Request with ip */
+
+function mockRequest(ip = '127.0.0.1') {
+  return {
+    ip,
+    socket: { remoteAddress: ip },
+  } as unknown as import('express').Request;
+}
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: jest.Mocked<AuthService>;
@@ -21,7 +30,7 @@ describe('AuthController', () => {
     firstName: 'Test',
     lastName: 'User',
     phone: '+17868391882',
-    role: UserRole.CLIENT,
+    roles: [UserRole.USER],
     emailVerified: true,
     phoneVerified: false,
     isActive: true,
@@ -37,10 +46,16 @@ describe('AuthController', () => {
     login: jest.fn(),
     refresh: jest.fn(),
     logout: jest.fn(),
+    logoutAll: jest.fn(),
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
     getMe: jest.fn(),
+    getUserSessions: jest.fn(),
+    revokeSession: jest.fn(),
+    requestChangePassword: jest.fn(),
+    confirmChangePassword: jest.fn(),
+    getMcpScopes: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -151,9 +166,17 @@ describe('AuthController', () => {
 
       authService.login.mockResolvedValue(expectedResponse);
 
-      const result = await controller.login(loginDto);
+      const result = await controller.login(
+        loginDto,
+        mockRequest('127.0.0.1'),
+        'test-agent',
+      );
 
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(authService.login).toHaveBeenCalledWith(
+        loginDto,
+        '127.0.0.1',
+        'test-agent',
+      );
       expect(result).toEqual(expectedResponse);
     });
 
@@ -166,7 +189,11 @@ describe('AuthController', () => {
 
       authService.login.mockResolvedValue(expectedResponse);
 
-      const result = await controller.login(loginDto);
+      const result = await controller.login(
+        loginDto,
+        mockRequest('127.0.0.1'),
+        'test-agent',
+      );
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
@@ -188,11 +215,18 @@ describe('AuthController', () => {
 
       authService.refresh.mockResolvedValue(expectedResponse);
 
-      const result = await controller.refresh(refreshTokenDto, userId);
+      const result = await controller.refresh(
+        refreshTokenDto,
+        userId,
+        mockRequest('127.0.0.1'),
+        'test-agent',
+      );
 
       expect(authService.refresh).toHaveBeenCalledWith(
         refreshTokenDto.refreshToken,
         userId,
+        '127.0.0.1',
+        'test-agent',
       );
       expect(result).toEqual(expectedResponse);
     });
@@ -205,7 +239,12 @@ describe('AuthController', () => {
 
       authService.refresh.mockResolvedValue(expectedResponse);
 
-      const result = await controller.refresh(refreshTokenDto, userId);
+      const result = await controller.refresh(
+        refreshTokenDto,
+        userId,
+        mockRequest('127.0.0.1'),
+        'test-agent',
+      );
 
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
@@ -222,9 +261,19 @@ describe('AuthController', () => {
 
       authService.logout.mockResolvedValue(expectedResponse);
 
-      const result = await controller.logout(userId);
+      const result = await controller.logout(
+        userId,
+        undefined,
+        mockRequest('127.0.0.1'),
+        'test-agent',
+      );
 
-      expect(authService.logout).toHaveBeenCalledWith(userId);
+      expect(authService.logout).toHaveBeenCalledWith(
+        userId,
+        undefined,
+        '127.0.0.1',
+        'test-agent',
+      );
       expect(result).toEqual(expectedResponse);
     });
   });

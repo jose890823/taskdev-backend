@@ -42,6 +42,7 @@ export class S3StorageProvider implements IStorageProvider {
   /**
    * Inicializar el proveedor con su configuración
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- S3Client constructor is synchronous; async keeps interface contract
   async initialize(providerConfig: StorageProviderConfig): Promise<void> {
     const config = providerConfig.config as S3Config;
 
@@ -50,7 +51,12 @@ export class S3StorageProvider implements IStorageProvider {
     this.endpoint = config.endpoint;
     this.defaultExpiration = providerConfig.settings?.urlExpiration || 3600;
 
-    const clientConfig: any = {
+    const clientConfig: {
+      region: string;
+      credentials: { accessKeyId: string; secretAccessKey: string };
+      endpoint?: string;
+      forcePathStyle?: boolean;
+    } = {
       region: this.region,
       credentials: {
         accessKeyId: config.accessKeyId,
@@ -137,7 +143,7 @@ export class S3StorageProvider implements IStorageProvider {
     // Convertir stream a buffer
     const chunks: Buffer[] = [];
     for await (const chunk of response.Body as Readable) {
-      chunks.push(Buffer.from(chunk));
+      chunks.push(Buffer.from(chunk as ArrayBufferLike));
     }
 
     return Buffer.concat(chunks);
@@ -181,8 +187,8 @@ export class S3StorageProvider implements IStorageProvider {
       await this.client!.send(command);
       this.logger.log(`File deleted from S3: ${key}`);
       return true;
-    } catch (error: any) {
-      if (error.name === 'NoSuchKey') {
+    } catch (error: unknown) {
+      if ((error as Error).name === 'NoSuchKey') {
         return false;
       }
       throw error;
@@ -224,11 +230,12 @@ export class S3StorageProvider implements IStorageProvider {
 
       await this.client!.send(command);
       return true;
-    } catch (error: any) {
-      if (
-        error.name === 'NotFound' ||
-        error.$metadata?.httpStatusCode === 404
-      ) {
+    } catch (error: unknown) {
+      const e = error as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
+      if (e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404) {
         return false;
       }
       throw error;
@@ -412,6 +419,7 @@ export class S3StorageProvider implements IStorageProvider {
   /**
    * Obtener información del espacio usado
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- S3 has no native usage API; async keeps interface contract
   async getUsageInfo(): Promise<{
     used: number;
     total?: number;

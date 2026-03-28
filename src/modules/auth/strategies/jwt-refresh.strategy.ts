@@ -24,11 +24,16 @@ export class JwtRefreshStrategy extends PassportStrategy(
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {
+    const secret = configService.get<string>('JWT_REFRESH_SECRET');
+    if (!secret) {
+      throw new Error(
+        'JWT_REFRESH_SECRET no esta configurado. Configura la variable de entorno JWT_REFRESH_SECRET.',
+      );
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
-      secretOrKey:
-        configService.get<string>('JWT_REFRESH_SECRET') ||
-        'default-refresh-secret',
+      secretOrKey: secret,
       ignoreExpiration: false,
     });
   }

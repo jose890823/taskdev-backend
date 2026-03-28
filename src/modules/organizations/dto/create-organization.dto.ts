@@ -2,7 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateOrganizationDto {
-  @ApiProperty({ example: 'Acme Corp', description: 'Nombre de la organizacion' })
+  @ApiProperty({
+    example: 'Acme Corp',
+    description: 'Nombre de la organizacion',
+  })
   @IsNotEmpty({ message: 'El nombre es obligatorio' })
   @IsString({ message: 'El nombre debe ser texto' })
   @MaxLength(255, { message: 'El nombre no puede exceder 255 caracteres' })

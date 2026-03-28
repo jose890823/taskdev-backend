@@ -53,7 +53,12 @@ export class NotificationsController {
   ): Promise<{
     data: Notification[];
     unreadCount: number;
-    pagination: { total: number; page: number; limit: number; totalPages: number };
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     return this.notificationsService.findByUser(user.id, query);
   }
@@ -89,8 +94,9 @@ export class NotificationsController {
   })
   async findById(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
   ): Promise<Notification> {
-    return this.notificationsService.findById(id);
+    return this.notificationsService.findById(id, user.id);
   }
 
   // ============================================

@@ -1,6 +1,5 @@
-import { Processor, Process } from '@nestjs/bull';
+import { Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import type { Job } from 'bull';
 import { DataSource } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -32,7 +31,7 @@ export class MichambitaJobsProcessor {
    */
   private async createExecution(
     jobName: string,
-    input: any,
+    input: Record<string, unknown> | null | undefined,
     attemptNumber: number,
   ): Promise<JobExecution> {
     try {
@@ -44,9 +43,10 @@ export class MichambitaJobsProcessor {
         attemptNumber,
       });
       return await this.jobExecutionRepository.save(execution);
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `No se pudo crear registro de ejecucion para ${jobName}: ${error.message}`,
+        `No se pudo crear registro de ejecucion para ${jobName}: ${msg}`,
       );
       return new JobExecution({
         jobName,
@@ -61,7 +61,7 @@ export class MichambitaJobsProcessor {
    */
   private async completeExecution(
     execution: JobExecution,
-    result: any,
+    result: Record<string, unknown>,
     startTime: number,
   ): Promise<void> {
     try {
@@ -73,10 +73,9 @@ export class MichambitaJobsProcessor {
       if (execution.id) {
         await this.jobExecutionRepository.save(execution);
       }
-    } catch (error) {
-      this.logger.warn(
-        `No se pudo actualizar registro de ejecucion: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`No se pudo actualizar registro de ejecucion: ${msg}`);
     }
   }
 
@@ -85,23 +84,25 @@ export class MichambitaJobsProcessor {
    */
   private async failExecution(
     execution: JobExecution,
-    error: any,
+    error: unknown,
     startTime: number,
   ): Promise<void> {
     try {
       execution.status = JobExecutionStatus.FAILED;
-      execution.errorMessage = error.message || 'Error desconocido';
-      execution.errorStack = error.stack || null;
+      execution.errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      execution.errorStack =
+        error instanceof Error ? (error.stack ?? null) : null;
       execution.durationMs = Date.now() - startTime;
       execution.completedAt = new Date();
 
       if (execution.id) {
         await this.jobExecutionRepository.save(execution);
       }
-    } catch (saveError) {
-      this.logger.warn(
-        `No se pudo registrar fallo de ejecucion: ${saveError.message}`,
-      );
+    } catch (saveError: unknown) {
+      const msg =
+        saveError instanceof Error ? saveError.message : String(saveError);
+      this.logger.warn(`No se pudo registrar fallo de ejecucion: ${msg}`);
     }
   }
 }

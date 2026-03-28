@@ -3,7 +3,10 @@ import { IsEmail, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
 import { OrganizationRole } from '../../organizations/entities/organization-member.entity';
 
 export class CreateInvitationDto {
-  @ApiProperty({ example: 'user@example.com', description: 'Email del invitado' })
+  @ApiProperty({
+    example: 'user@example.com',
+    description: 'Email del invitado',
+  })
   @IsNotEmpty({ message: 'El email es obligatorio' })
   @IsEmail({}, { message: 'Email no valido' })
   email: string;

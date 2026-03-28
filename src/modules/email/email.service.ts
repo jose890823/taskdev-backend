@@ -42,8 +42,7 @@ export class EmailService {
   constructor(private configService: ConfigService) {
     this.defaultFrom =
       this.configService.get<string>('EMAIL_FROM') || 'noreply@taskhub.dev';
-    this.brandName =
-      this.configService.get<string>('BRAND_NAME') || 'TaskHub';
+    this.brandName = this.configService.get<string>('BRAND_NAME') || 'TaskHub';
     this.initialize();
   }
 
@@ -65,8 +64,9 @@ export class EmailService {
         this.logger.log('✅ EmailService configurado con Resend');
         this.logger.log(`📧 Enviando desde: ${this.defaultFrom}`);
         return;
-      } catch (error) {
-        this.logger.warn('⚠️ Error inicializando Resend:', error.message);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn('⚠️ Error inicializando Resend:', msg);
       }
     }
 
@@ -100,8 +100,9 @@ export class EmailService {
         this.logger.log('✅ EmailService configurado con Gmail API (HTTPS)');
         this.logger.log(`📧 Usando cuenta: ${gmailUser}`);
         return true;
-      } catch (error) {
-        this.logger.warn('⚠️ Error inicializando Gmail API:', error.message);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn('⚠️ Error inicializando Gmail API:', msg);
       }
     }
     return false;
@@ -132,8 +133,9 @@ export class EmailService {
         this.logger.log('✅ EmailService configurado con Gmail SMTP');
         this.logger.log(`📧 Usando cuenta: ${gmailUser}`);
         return true;
-      } catch (error) {
-        this.logger.warn('⚠️ Error inicializando Gmail SMTP:', error.message);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn('⚠️ Error inicializando Gmail SMTP:', msg);
       }
     }
     return false;
@@ -180,7 +182,9 @@ export class EmailService {
 
     let body: string;
     if (params.html && params.text) {
-      headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+      headers.push(
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      );
       body = [
         `--${boundary}`,
         'Content-Type: text/plain; charset=UTF-8',
@@ -227,7 +231,8 @@ export class EmailService {
       requestBody: { raw },
     });
 
-    this.logger.log(`📧 Email enviado via Gmail API a ${params.to}`);
+    const toStr = Array.isArray(params.to) ? params.to.join(', ') : params.to;
+    this.logger.log(`📧 Email enviado via Gmail API a ${toStr}`);
     return { success: true, messageId: result.data.id || undefined };
   }
 
@@ -239,7 +244,8 @@ export class EmailService {
 
     // Modo simulado
     if (this.provider === 'none') {
-      this.logger.debug(`📧 [SIMULADO] Email a ${dto.to}: ${dto.subject}`);
+      const toLogStr = Array.isArray(dto.to) ? dto.to.join(', ') : dto.to;
+      this.logger.debug(`📧 [SIMULADO] Email a ${toLogStr}: ${dto.subject}`);
       return { success: true, messageId: 'simulated' };
     }
 
@@ -259,7 +265,8 @@ export class EmailService {
           throw new Error(result.error.message);
         }
 
-        this.logger.log(`Email enviado via Resend a ${dto.to}`);
+        const toStr = Array.isArray(dto.to) ? dto.to.join(', ') : dto.to;
+        this.logger.log(`Email enviado via Resend a ${toStr}`);
         return { success: true, messageId: result.data?.id };
       }
 
@@ -277,6 +284,7 @@ export class EmailService {
 
       // Gmail SMTP
       if (this.provider === 'gmail' && this.gmailTransporter) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- nodemailer has no bundled TS types; sendMail result is untyped
         const info = await this.gmailTransporter.sendMail({
           from,
           to: dto.to,
@@ -286,14 +294,21 @@ export class EmailService {
           replyTo: dto.replyTo,
         });
 
-        this.logger.log(`📧 Email enviado via Gmail a ${dto.to}`);
-        return { success: true, messageId: info.messageId };
+        const toStr = Array.isArray(dto.to) ? dto.to.join(', ') : dto.to;
+        this.logger.log(`📧 Email enviado via Gmail a ${toStr}`);
+        return {
+          success: true,
+
+          messageId: (info as { messageId?: string }).messageId,
+        };
       }
 
       throw new Error('No email provider available');
-    } catch (error) {
-      this.logger.error(`❌ Error enviando email a ${dto.to}:`, error.message);
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const toStr = Array.isArray(dto.to) ? dto.to.join(', ') : dto.to;
+      this.logger.error(`❌ Error enviando email a ${toStr}:`, msg);
+      return { success: false, error: msg };
     }
   }
 
@@ -371,7 +386,9 @@ export class EmailService {
    */
   async sendInvitationEmail(dto: SendInvitationEmailDto): Promise<EmailResult> {
     if (this.provider === 'none') {
-      this.logger.log(`📧 [SIMULADO] Invitacion para ${dto.to}: ${dto.inviteUrl}`);
+      this.logger.log(
+        `📧 [SIMULADO] Invitacion para ${dto.to}: ${dto.inviteUrl}`,
+      );
       return { success: true, messageId: 'simulated' };
     }
 
@@ -427,11 +444,12 @@ export class EmailService {
           provider: 'gmail-api',
           message: 'Gmail API (HTTPS) conectado correctamente',
         };
-      } catch (error) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           provider: 'gmail-api',
-          message: error.message,
+          message: msg,
         };
       }
     }
@@ -444,11 +462,12 @@ export class EmailService {
           provider: 'gmail',
           message: 'Gmail SMTP conectado correctamente',
         };
-      } catch (error) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           provider: 'gmail',
-          message: error.message,
+          message: msg,
         };
       }
     }

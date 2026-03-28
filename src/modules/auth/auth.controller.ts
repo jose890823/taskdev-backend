@@ -8,9 +8,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Ip,
+  Req,
   Headers,
 } from '@nestjs/common';
+import * as express from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -240,11 +241,10 @@ export class AuthController {
   })
   async login(
     @Body() loginDto: LoginDto,
-    @Ip() ip: string,
+    @Req() req: express.Request,
     @Headers('user-agent') userAgent: string,
-    @Headers('x-forwarded-for') forwardedFor?: string,
   ) {
-    const ipAddress = forwardedFor || ip || 'unknown';
+    const ipAddress = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.authService.login(loginDto, ipAddress, userAgent || 'unknown');
   }
 
@@ -279,11 +279,10 @@ export class AuthController {
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
     @CurrentUser('id') userId: string,
-    @Ip() ip: string,
+    @Req() req: express.Request,
     @Headers('user-agent') userAgent: string,
-    @Headers('x-forwarded-for') forwardedFor?: string,
   ) {
-    const ipAddress = forwardedFor || ip || 'unknown';
+    const ipAddress = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.authService.refresh(
       refreshTokenDto.refreshToken,
       userId,
@@ -335,11 +334,10 @@ export class AuthController {
   async logout(
     @CurrentUser('id') userId: string,
     @Body('refreshToken') refreshToken: string | undefined,
-    @Ip() ip: string,
+    @Req() req: express.Request,
     @Headers('user-agent') userAgent: string,
-    @Headers('x-forwarded-for') forwardedFor?: string,
   ) {
-    const ipAddress = forwardedFor || ip || 'unknown';
+    const ipAddress = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.authService.logout(
       userId,
       refreshToken,
@@ -379,11 +377,10 @@ export class AuthController {
   })
   async logoutAll(
     @CurrentUser('id') userId: string,
-    @Ip() ip: string,
+    @Req() req: express.Request,
     @Headers('user-agent') userAgent: string,
-    @Headers('x-forwarded-for') forwardedFor?: string,
   ) {
-    const ipAddress = forwardedFor || ip || 'unknown';
+    const ipAddress = req.ip || req.socket?.remoteAddress || 'unknown';
     return this.authService.logoutAll(
       userId,
       ipAddress,
@@ -701,7 +698,7 @@ export class AuthController {
     description: 'No autenticado',
     type: ErrorResponseDto,
   })
-  async getMcpScopes(@CurrentUser() user: User) {
+  getMcpScopes(@CurrentUser() user: User) {
     return this.authService.getMcpScopes(user);
   }
 

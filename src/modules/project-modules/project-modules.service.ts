@@ -1,8 +1,17 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProjectModule } from './entities/project-module.entity';
-import { CreateProjectModuleDto, UpdateProjectModuleDto, ReorderModulesDto } from './dto';
+import {
+  CreateProjectModuleDto,
+  UpdateProjectModuleDto,
+  ReorderModulesDto,
+} from './dto';
 
 @Injectable()
 export class ProjectModulesService {
@@ -13,29 +22,40 @@ export class ProjectModulesService {
     private readonly moduleRepository: Repository<ProjectModule>,
   ) {}
 
-  async create(projectId: string, dto: CreateProjectModuleDto): Promise<ProjectModule> {
+  async create(
+    projectId: string,
+    dto: CreateProjectModuleDto,
+  ): Promise<ProjectModule> {
     const parentId = dto.parentId || null;
 
     if (parentId) {
-      const parent = await this.moduleRepository.findOne({ where: { id: parentId } });
+      const parent = await this.moduleRepository.findOne({
+        where: { id: parentId },
+      });
       if (!parent) {
         throw new NotFoundException('Modulo padre no encontrado');
       }
       if (parent.projectId !== projectId) {
-        throw new BadRequestException('El modulo padre no pertenece a este proyecto');
+        throw new BadRequestException(
+          'El modulo padre no pertenece a este proyecto',
+        );
       }
       const depth = await this.getModuleDepth(parent);
       if (depth >= 2) {
-        throw new BadRequestException('Se alcanzo el limite maximo de profundidad (3 niveles)');
+        throw new BadRequestException(
+          'Se alcanzo el limite maximo de profundidad (3 niveles)',
+        );
       }
     }
 
     const maxPos = await this.moduleRepository
       .createQueryBuilder('m')
       .where('m.projectId = :projectId', { projectId })
-      .andWhere(parentId ? 'm.parentId = :parentId' : 'm.parentId IS NULL', { parentId })
+      .andWhere(parentId ? 'm.parentId = :parentId' : 'm.parentId IS NULL', {
+        parentId,
+      })
       .select('MAX(m.position)', 'max')
-      .getRawOne();
+      .getRawOne<{ max: number | null }>();
 
     const mod = this.moduleRepository.create({
       ...dto,
@@ -46,7 +66,9 @@ export class ProjectModulesService {
     return this.moduleRepository.save(mod);
   }
 
-  async findByProject(projectId: string): Promise<ProjectModule[]> {
+  async findByProject(
+    projectId: string,
+  ): Promise<Array<Record<string, unknown>>> {
     const all = await this.moduleRepository.find({
       where: { projectId },
       order: { position: 'ASC' },
@@ -67,7 +89,10 @@ export class ProjectModulesService {
     return mod;
   }
 
-  async update(id: string, dto: UpdateProjectModuleDto): Promise<ProjectModule> {
+  async update(
+    id: string,
+    dto: UpdateProjectModuleDto,
+  ): Promise<ProjectModule> {
     const mod = await this.findById(id);
     Object.assign(mod, dto);
     return this.moduleRepository.save(mod);
@@ -93,27 +118,34 @@ export class ProjectModulesService {
     let currentParentId = mod.parentId;
     while (currentParentId) {
       depth++;
-      const parent = await this.moduleRepository.findOne({ where: { id: currentParentId } });
+      const parent = await this.moduleRepository.findOne({
+        where: { id: currentParentId },
+      });
       currentParentId = parent?.parentId || null;
     }
     return depth;
   }
 
-  private buildTree(modules: ProjectModule[]): any[] {
+  private buildTree(modules: ProjectModule[]): Array<Record<string, unknown>> {
     // Convert TypeORM entities to plain objects (spread misses relation-managed columns like parentId)
-    const plain = JSON.parse(JSON.stringify(modules));
+    const plain = JSON.parse(JSON.stringify(modules)) as Array<
+      Record<string, unknown>
+    >;
 
-    const map = new Map<string, any>();
-    const roots: any[] = [];
+    const map = new Map<string, Record<string, unknown>>();
+    const roots: Array<Record<string, unknown>> = [];
 
     for (const m of plain) {
-      map.set(m.id, { ...m, children: [] });
+      map.set(m.id as string, { ...m, children: [] });
     }
 
     for (const m of plain) {
-      const node = map.get(m.id)!;
-      if (m.parentId && map.has(m.parentId)) {
-        map.get(m.parentId)!.children.push(node);
+      const node = map.get(m.id as string)!;
+      const parentId = m.parentId as string | null | undefined;
+      if (parentId && map.has(parentId)) {
+        (map.get(parentId)!.children as Array<Record<string, unknown>>).push(
+          node,
+        );
       } else {
         roots.push(node);
       }

@@ -1,5 +1,10 @@
 import {
-  Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index,
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -35,14 +40,26 @@ export class Invitation {
   invitedById: string;
 
   @ApiProperty({ enum: InvitationStatus })
-  @Column({ type: 'enum', enum: InvitationStatus, default: InvitationStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: InvitationStatus,
+    default: InvitationStatus.PENDING,
+  })
   status: InvitationStatus;
 
-  @ApiProperty({ example: null, description: 'ID del proyecto (si es invitacion a proyecto)', nullable: true })
+  @ApiProperty({
+    example: null,
+    description: 'ID del proyecto (si es invitacion a proyecto)',
+    nullable: true,
+  })
   @Column({ type: 'uuid', nullable: true })
   projectId: string | null;
 
-  @ApiProperty({ example: null, description: 'Rol en el proyecto', nullable: true })
+  @ApiProperty({
+    example: null,
+    description: 'Rol en el proyecto',
+    nullable: true,
+  })
   @Column({ type: 'varchar', length: 50, nullable: true })
   projectRole: string | null;
 

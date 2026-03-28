@@ -15,6 +15,8 @@ export class NotificationCleanupService {
   async handleCleanup(): Promise<void> {
     this.logger.log('Iniciando limpieza de notificaciones expiradas...');
     const deleted = await this.notificationsService.cleanExpired();
-    this.logger.log(`Limpieza completada: ${deleted} notificaciones eliminadas`);
+    this.logger.log(
+      `Limpieza completada: ${deleted} notificaciones eliminadas`,
+    );
   }
 }

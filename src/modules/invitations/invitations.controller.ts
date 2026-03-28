@@ -1,8 +1,21 @@
 import {
-  Controller, Get, Post, Delete, Body, Param, ParseUUIDPipe,
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { InvitationsService } from './invitations.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { ProjectsService } from '../projects/projects.service';
 import { CreateInvitationDto, CreateProjectInvitationDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
@@ -12,7 +25,11 @@ import { Public } from '../auth/decorators/public.decorator';
 @ApiBearerAuth()
 @Controller()
 export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) {}
+  constructor(
+    private readonly invitationsService: InvitationsService,
+    private readonly organizationsService: OrganizationsService,
+    private readonly projectsService: ProjectsService,
+  ) {}
 
   @Post('organizations/:id/invitations')
   @ApiOperation({ summary: 'Invitar usuario a organizacion' })
@@ -26,24 +43,49 @@ export class InvitationsController {
 
   @Get('organizations/:id/invitations')
   @ApiOperation({ summary: 'Listar invitaciones de organizacion' })
-  async findByOrganization(@Param('id', ParseUUIDPipe) organizationId: string) {
+  async findByOrganization(
+    @Param('id', ParseUUIDPipe) organizationId: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.organizationsService.verifyMemberAccess(
+      organizationId,
+      user.id,
+      user.isSuperAdmin(),
+    );
+
     return this.invitationsService.findByOrganization(organizationId);
   }
 
   @Post('projects/:id/invitations')
   @ApiOperation({ summary: 'Invitar usuario a proyecto por email' })
-  @ApiResponse({ status: 201, description: 'Usuario agregado o invitacion enviada' })
+  @ApiResponse({
+    status: 201,
+    description: 'Usuario agregado o invitacion enviada',
+  })
   async createProjectInvitation(
     @Param('id', ParseUUIDPipe) projectId: string,
     @Body() dto: CreateProjectInvitationDto,
     @CurrentUser() user: User,
   ) {
-    return this.invitationsService.createProjectInvitation(projectId, dto, user);
+    return this.invitationsService.createProjectInvitation(
+      projectId,
+      dto,
+      user,
+    );
   }
 
   @Get('projects/:id/invitations')
   @ApiOperation({ summary: 'Listar invitaciones pendientes de un proyecto' })
-  async findByProject(@Param('id', ParseUUIDPipe) projectId: string) {
+  async findByProject(
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.projectsService.verifyMemberAccess(
+      projectId,
+      user.id,
+      user.isSuperAdmin(),
+    );
+
     return this.invitationsService.findByProject(projectId);
   }
 
@@ -62,14 +104,20 @@ export class InvitationsController {
 
   @Post('invitations/:id/resend')
   @ApiOperation({ summary: 'Reenviar invitacion pendiente' })
-  async resend(@Param('id', ParseUUIDPipe) id: string) {
-    return this.invitationsService.resend(id);
+  async resend(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.invitationsService.resend(id, user.id);
   }
 
   @Delete('invitations/:id')
   @ApiOperation({ summary: 'Cancelar invitacion' })
-  async cancel(@Param('id', ParseUUIDPipe) id: string) {
-    await this.invitationsService.cancel(id);
+  async cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.invitationsService.cancel(id, user.id);
     return { message: 'Invitacion cancelada' };
   }
 }

@@ -18,6 +18,9 @@ import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UserActivityService } from '../users/services/user-activity.service';
+import { LoginAttemptService } from '../security/services/login-attempt.service';
+import { ActiveSessionService } from '../security/services/active-session.service';
 
 // Mock bcrypt module
 jest.mock('bcrypt', () => ({
@@ -31,7 +34,10 @@ describe('AuthService', () => {
   let service: AuthService;
   let userRepository: jest.Mocked<Repository<User>>;
   let jwtService: jest.Mocked<JwtService>;
-  let configService: jest.Mocked<ConfigService>;
+  let _configService: jest.Mocked<ConfigService>;
+  let _loginAttemptService: jest.Mocked<LoginAttemptService>;
+  let _activeSessionService: jest.Mocked<ActiveSessionService>;
+  let _userActivityService: jest.Mocked<UserActivityService>;
 
   const mockUser: User = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -40,7 +46,7 @@ describe('AuthService', () => {
     firstName: 'Test',
     lastName: 'User',
     phone: '+17868391882',
-    role: UserRole.CLIENT,
+    roles: [UserRole.USER],
     emailVerified: true,
     phoneVerified: false,
     isActive: true,
@@ -55,16 +61,43 @@ describe('AuthService', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
+    systemCode: 'USR-TEST-001',
+    slug: null,
+    profilePhoto: null,
+    address: null,
+    city: null,
+    state: null,
+    zipCode: null,
+    country: null,
+    dateOfBirth: null,
+    identificationNumber: null,
+    preferredLanguage: 'es',
+    preferredCurrency: 'USD',
+    preferredTimezone: 'America/New_York',
+    isSystemUser: false,
     isOtpExpired: jest.fn().mockReturnValue(false),
     isResetTokenExpired: jest.fn().mockReturnValue(false),
     hasReachedMaxOtpAttempts: jest.fn().mockReturnValue(false),
-  };
+    get role() {
+      return UserRole.USER;
+    },
+    get fullName() {
+      return 'Test User';
+    },
+    generateSystemCode: jest.fn(),
+    hasRole: jest.fn(),
+    hasAnyRole: jest.fn(),
+    isAdmin: jest.fn(),
+    isSuperAdmin: jest.fn(),
+    isUser: jest.fn(),
+  } as unknown as User;
 
   beforeEach(async () => {
     const mockRepository = {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
+      remove: jest.fn(),
     };
 
     const mockJwtService = {
@@ -72,19 +105,38 @@ describe('AuthService', () => {
     };
 
     const mockConfigService = {
-      get: jest.fn((key: string, defaultValue?: any) => {
-        const config = {
-          BCRYPT_ROUNDS: 10,
-          OTP_LENGTH: 6,
-          OTP_EXPIRATION_MINUTES: 10,
-          OTP_MAX_ATTEMPTS: 3,
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        const config: Record<string, unknown> = {
+          BCRYPT_ROUNDS: '10',
+          OTP_LENGTH: '6',
+          OTP_EXPIRATION_MINUTES: '10',
+          OTP_MAX_ATTEMPTS: '3',
           JWT_SECRET: 'test-secret',
           JWT_EXPIRATION: '15m',
           JWT_REFRESH_SECRET: 'test-refresh-secret',
           JWT_REFRESH_EXPIRATION: '7d',
         };
-        return config[key] || defaultValue;
+        return config[key] ?? defaultValue;
       }),
+    };
+
+    const mockLoginAttemptService = {
+      canAttemptLogin: jest.fn().mockResolvedValue({ allowed: true }),
+      recordFailure: jest.fn().mockResolvedValue({ shouldBlock: false }),
+      recordSuccess: jest.fn().mockResolvedValue({}),
+    };
+
+    const mockActiveSessionService = {
+      createSession: jest.fn().mockResolvedValue({}),
+      updateActivity: jest.fn().mockResolvedValue(undefined),
+      revokeSession: jest.fn().mockResolvedValue(true),
+      revokeSessionById: jest.fn().mockResolvedValue(true),
+      revokeAllUserSessions: jest.fn().mockResolvedValue(1),
+      getUserSessions: jest.fn().mockResolvedValue([]),
+    };
+
+    const mockUserActivityService = {
+      logActivity: jest.fn().mockResolvedValue({}),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -102,13 +154,28 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: UserActivityService,
+          useValue: mockUserActivityService,
+        },
+        {
+          provide: LoginAttemptService,
+          useValue: mockLoginAttemptService,
+        },
+        {
+          provide: ActiveSessionService,
+          useValue: mockActiveSessionService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     userRepository = module.get(getRepositoryToken(User));
     jwtService = module.get(JwtService);
-    configService = module.get(ConfigService);
+    _configService = module.get(ConfigService);
+    _loginAttemptService = module.get(LoginAttemptService);
+    _activeSessionService = module.get(ActiveSessionService);
+    _userActivityService = module.get(UserActivityService);
   });
 
   afterEach(() => {
@@ -126,6 +193,7 @@ describe('AuthService', () => {
     };
 
     it('debe registrar un nuevo usuario exitosamente', async () => {
+      // findOne is called with withDeleted: true — return null (user does not exist)
       userRepository.findOne.mockResolvedValue(null);
       userRepository.create.mockReturnValue({
         ...mockUser,
@@ -145,6 +213,7 @@ describe('AuthService', () => {
 
       expect(userRepository.findOne).toHaveBeenCalledWith({
         where: { email: registerDto.email },
+        withDeleted: true,
       });
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('message');
@@ -153,7 +222,11 @@ describe('AuthService', () => {
     });
 
     it('debe lanzar ConflictException si el email ya existe', async () => {
-      userRepository.findOne.mockResolvedValue(mockUser);
+      // Return a non-deleted user (deletedAt is null)
+      userRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        deletedAt: null,
+      } as User);
 
       await expect(service.register(registerDto)).rejects.toThrow(
         ConflictException,
@@ -326,9 +399,7 @@ describe('AuthService', () => {
         .mockResolvedValueOnce('access-token')
         .mockResolvedValueOnce('refresh-token');
 
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(true) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
       jest
         .spyOn(bcrypt, 'hash')
         .mockResolvedValue('hashedRefreshToken' as never);
@@ -385,12 +456,13 @@ describe('AuthService', () => {
 
     it('debe lanzar UnauthorizedException si la contraseña es incorrecta', async () => {
       userRepository.findOne.mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(false) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
+      );
+      await expect(service.login(loginDto)).rejects.toThrow(
+        'Credenciales inválidas',
       );
       await expect(service.login(loginDto)).rejects.toThrow(
         'Credenciales inválidas',
@@ -409,9 +481,7 @@ describe('AuthService', () => {
         .mockResolvedValueOnce('new-access-token')
         .mockResolvedValueOnce('new-refresh-token');
 
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(true) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
       jest
         .spyOn(bcrypt, 'hash')
         .mockResolvedValue('newHashedRefreshToken' as never);
@@ -463,9 +533,7 @@ describe('AuthService', () => {
 
     it('debe lanzar UnauthorizedException si el refresh token es inválido', async () => {
       userRepository.findOne.mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(false) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(service.refresh(refreshToken, userId)).rejects.toThrow(
         UnauthorizedException,
@@ -598,9 +666,7 @@ describe('AuthService', () => {
         password: 'newHashedPassword',
       } as User);
 
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(true) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
       jest
         .spyOn(bcrypt, 'hash')
         .mockResolvedValue('newHashedPassword' as never);
@@ -621,9 +687,7 @@ describe('AuthService', () => {
 
     it('debe lanzar BadRequestException si la contraseña actual es incorrecta', async () => {
       userRepository.findOne.mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(() => Promise.resolve(false) as any);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
       await expect(
         service.changePassword(userId, changePasswordDto),

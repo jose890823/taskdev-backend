@@ -1,5 +1,8 @@
 import {
-  Injectable, Logger, NotFoundException, ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -26,7 +29,11 @@ export class CommentsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async verifyTaskAccess(taskId: string, userId: string, isSuperAdmin = false): Promise<void> {
+  async verifyTaskAccess(
+    taskId: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
     await this.tasksService.verifyTaskAccess(taskId, userId, isSuperAdmin);
   }
 
@@ -40,12 +47,15 @@ export class CommentsService {
     // Auto-mark as read for the comment author
     await this.markAsRead(dto.taskId, user.id);
 
-    this.logger.log(`Comentario creado por ${user.email} en tarea ${dto.taskId}`);
+    this.logger.log(
+      `Comentario creado por ${user.email} en tarea ${dto.taskId}`,
+    );
 
     // Emit task.commented event
-    this.emitTaskCommented(dto.taskId, user).catch(err =>
-      this.logger.error(`Error emitting task.commented: ${err.message}`),
-    );
+    this.emitTaskCommented(dto.taskId, user).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Error emitting task.commented: ${msg}`);
+    });
 
     return {
       ...comment,
@@ -59,11 +69,15 @@ export class CommentsService {
   }
 
   private async emitTaskCommented(taskId: string, user: User): Promise<void> {
-    const task = await this.dataSource.getRepository(Task).findOne({ where: { id: taskId } });
+    const task = await this.dataSource
+      .getRepository(Task)
+      .findOne({ where: { id: taskId } });
     if (!task) return;
 
-    const assignees = await this.dataSource.getRepository(TaskAssignee).find({ where: { taskId } });
-    const assigneeIds = assignees.map(a => a.userId);
+    const assignees = await this.dataSource
+      .getRepository(TaskAssignee)
+      .find({ where: { taskId } });
+    const assigneeIds = assignees.map((a) => a.userId);
 
     // Also include task creator if not in assignees
     if (task.createdById && !assigneeIds.includes(task.createdById)) {
@@ -97,19 +111,21 @@ export class CommentsService {
       await this.markAsRead(taskId, currentUserId);
     }
 
-    return comments.map(c => ({
+    return comments.map((c) => ({
       id: c.id,
       taskId: c.taskId,
       userId: c.userId,
       content: c.content,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
-      author: c.user ? {
-        id: c.user.id,
-        firstName: c.user.firstName,
-        lastName: c.user.lastName,
-        email: c.user.email,
-      } : null,
+      author: c.user
+        ? {
+            id: c.user.id,
+            firstName: c.user.firstName,
+            lastName: c.user.lastName,
+            email: c.user.email,
+          }
+        : null,
     }));
   }
 
@@ -119,7 +135,11 @@ export class CommentsService {
     return comment;
   }
 
-  async update(id: string, dto: UpdateCommentDto, userId: string): Promise<Comment> {
+  async update(
+    id: string,
+    dto: UpdateCommentDto,
+    userId: string,
+  ): Promise<Comment> {
     const comment = await this.findById(id);
     if (comment.userId !== userId) {
       throw new ForbiddenException('Solo el autor puede editar el comentario');
@@ -131,7 +151,9 @@ export class CommentsService {
   async remove(id: string, userId: string): Promise<void> {
     const comment = await this.findById(id);
     if (comment.userId !== userId) {
-      throw new ForbiddenException('Solo el autor puede eliminar el comentario');
+      throw new ForbiddenException(
+        'Solo el autor puede eliminar el comentario',
+      );
     }
     await this.commentRepository.softDelete(id);
   }
