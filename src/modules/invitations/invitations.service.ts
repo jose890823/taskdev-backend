@@ -113,18 +113,24 @@ export class InvitationsService {
     const inviterName = `${user.firstName} ${user.lastName}`.trim();
 
     if (this.emailService?.sendInvitationEmail) {
-      const emailResult = await this.emailService.sendInvitationEmail({
-        to: dto.email,
-        organizationName: organization.name,
-        inviteUrl,
-        invitedByName: inviterName,
-        role: dto.role || OrganizationRole.MEMBER,
-      });
-      if (emailResult.success) {
-        this.logger.log(`✅ Email de invitacion enviado a ${dto.email}`);
-      } else {
+      try {
+        const emailResult = await this.emailService.sendInvitationEmail({
+          to: dto.email,
+          organizationName: organization.name,
+          inviteUrl,
+          invitedByName: inviterName,
+          role: dto.role || OrganizationRole.MEMBER,
+        });
+        if (emailResult.success) {
+          this.logger.log(`✅ Email de invitacion enviado a ${dto.email}`);
+        } else {
+          this.logger.warn(
+            `⚠️ Email de invitacion no enviado a ${dto.email}: ${emailResult.error}`,
+          );
+        }
+      } catch (error: unknown) {
         this.logger.warn(
-          `⚠️ Email de invitacion no enviado a ${dto.email}: ${emailResult.error}`,
+          `⚠️ Error enviando email de invitacion a ${dto.email}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     } else {
@@ -246,21 +252,27 @@ export class InvitationsService {
     const inviteUrl = `${frontendUrl}/invite/${token}`;
 
     if (this.emailService?.sendInvitationEmail) {
-      const emailResult = await this.emailService.sendInvitationEmail({
-        to: dto.email,
-        organizationName: organization.name,
-        inviteUrl,
-        invitedByName: inviterName,
-        role: projectRole,
-        projectName: project.name as string,
-      });
-      if (emailResult.success) {
-        this.logger.log(
-          `✅ Email de invitacion de proyecto enviado a ${dto.email}`,
-        );
-      } else {
+      try {
+        const emailResult = await this.emailService.sendInvitationEmail({
+          to: dto.email,
+          organizationName: organization.name,
+          inviteUrl,
+          invitedByName: inviterName,
+          role: projectRole,
+          projectName: project.name as string,
+        });
+        if (emailResult.success) {
+          this.logger.log(
+            `✅ Email de invitacion de proyecto enviado a ${dto.email}`,
+          );
+        } else {
+          this.logger.warn(
+            `⚠️ Email no enviado a ${dto.email}: ${emailResult.error}`,
+          );
+        }
+      } catch (error: unknown) {
         this.logger.warn(
-          `⚠️ Email no enviado a ${dto.email}: ${emailResult.error}`,
+          `⚠️ Error enviando email de invitacion a ${dto.email}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     } else {
@@ -437,21 +449,28 @@ export class InvitationsService {
     }
 
     if (this.emailService?.sendInvitationEmail) {
-      const emailResult = await this.emailService.sendInvitationEmail({
-        to: invitation.email,
-        organizationName: organization.name,
-        inviteUrl,
-        role: invitation.projectRole || invitation.role,
-        projectName,
-      });
-      if (emailResult.success) {
-        this.logger.log(
-          `✅ Email de invitacion reenviado a ${invitation.email}`,
+      try {
+        const emailResult = await this.emailService.sendInvitationEmail({
+          to: invitation.email,
+          organizationName: organization.name,
+          inviteUrl,
+          role: invitation.projectRole || invitation.role,
+          projectName,
+        });
+        if (emailResult.success) {
+          this.logger.log(
+            `✅ Email de invitacion reenviado a ${invitation.email}`,
+          );
+          return { message: `Invitacion reenviada a ${invitation.email}` };
+        }
+        this.logger.warn(`⚠️ No se pudo reenviar email a ${invitation.email}`);
+        return { message: 'Invitacion renovada pero no se pudo enviar el email' };
+      } catch (error: unknown) {
+        this.logger.warn(
+          `⚠️ Error reenviando email a ${invitation.email}: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return { message: `Invitacion reenviada a ${invitation.email}` };
+        return { message: 'Invitacion renovada pero no se pudo enviar el email' };
       }
-      this.logger.warn(`⚠️ No se pudo reenviar email a ${invitation.email}`);
-      return { message: 'Invitacion renovada pero no se pudo enviar el email' };
     }
 
     this.logger.warn(
