@@ -18,6 +18,8 @@ import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RequestChangePasswordDto } from './dto/request-change-password.dto';
+import { ConfirmChangePasswordDto } from './dto/confirm-change-password.dto';
 import { UserActivityService } from '../users/services/user-activity.service';
 import { LoginAttemptService } from '../security/services/login-attempt.service';
 import { ActiveSessionService } from '../security/services/active-session.service';
@@ -718,6 +720,286 @@ describe('AuthService', () => {
       userRepository.findOne.mockResolvedValue(null);
 
       await expect(service.getMe(userId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('logoutAll', () => {
+    const userId = mockUser.id;
+
+    it('debe cerrar todas las sesiones exitosamente', async () => {
+      userRepository.findOne.mockResolvedValue({ ...mockUser } as User);
+      userRepository.save.mockResolvedValue({
+        ...mockUser,
+        refreshToken: null,
+        refreshTokenExpiresAt: null,
+      } as User);
+      _activeSessionService.revokeAllUserSessions.mockResolvedValue(3);
+
+      const result = await service.logoutAll(userId);
+
+      expect(result.message).toContain('3 sesiones cerradas');
+      expect(result.sessionsRevoked).toBe(3);
+      expect(userRepository.save).toHaveBeenCalled();
+      expect(_activeSessionService.revokeAllUserSessions).toHaveBeenCalledWith(
+        userId,
+      );
+    });
+
+    it('debe lanzar NotFoundException si el usuario no existe', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.logoutAll(userId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('debe registrar actividad de logout', async () => {
+      userRepository.findOne.mockResolvedValue({ ...mockUser } as User);
+      userRepository.save.mockResolvedValue(mockUser);
+      _activeSessionService.revokeAllUserSessions.mockResolvedValue(1);
+
+      await service.logoutAll(userId, '127.0.0.1', 'TestAgent');
+
+      expect(_userActivityService.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: mockUser.id,
+          ipAddress: '127.0.0.1',
+          userAgent: 'TestAgent',
+        }),
+      );
+    });
+  });
+
+  describe('getUserSessions', () => {
+    const userId = mockUser.id;
+
+    it('debe retornar las sesiones activas del usuario', async () => {
+      const mockSessions = [
+        { id: 'session-1', userId, ipAddress: '127.0.0.1' },
+        { id: 'session-2', userId, ipAddress: '192.168.1.1' },
+      ];
+      _activeSessionService.getUserSessions.mockResolvedValue(mockSessions);
+
+      const result = await service.getUserSessions(userId);
+
+      expect(result).toEqual(mockSessions);
+      expect(_activeSessionService.getUserSessions).toHaveBeenCalledWith(
+        userId,
+      );
+    });
+
+    it('debe retornar array vacío si no hay sesiones', async () => {
+      _activeSessionService.getUserSessions.mockResolvedValue([]);
+
+      const result = await service.getUserSessions(userId);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('revokeSession', () => {
+    const userId = mockUser.id;
+    const sessionId = '123e4567-e89b-12d3-a456-426614174099';
+
+    it('debe revocar una sesión específica exitosamente', async () => {
+      _activeSessionService.revokeSessionById.mockResolvedValue(true);
+
+      const result = await service.revokeSession(userId, sessionId);
+
+      expect(result.message).toContain('revocada exitosamente');
+      expect(_activeSessionService.revokeSessionById).toHaveBeenCalledWith(
+        sessionId,
+        userId,
+      );
+    });
+
+    it('debe lanzar NotFoundException si la sesión no existe', async () => {
+      _activeSessionService.revokeSessionById.mockResolvedValue(false);
+
+      await expect(service.revokeSession(userId, sessionId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('requestChangePassword', () => {
+    const userId = mockUser.id;
+    const requestDto: RequestChangePasswordDto = {
+      oldPassword: 'OldP@ssw0rd123!',
+    };
+
+    it('debe solicitar cambio de contraseña y enviar OTP', async () => {
+      userRepository.findOne.mockResolvedValue({ ...mockUser } as User);
+      userRepository.save.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      const result = await service.requestChangePassword(userId, requestDto);
+
+      expect(result.message).toContain('Código de verificación enviado');
+      expect(userRepository.save).toHaveBeenCalled();
+    });
+
+    it('debe lanzar NotFoundException si el usuario no existe', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.requestChangePassword(userId, requestDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe lanzar BadRequestException si la contraseña actual es incorrecta', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+      await expect(
+        service.requestChangePassword(userId, requestDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.requestChangePassword(userId, requestDto),
+      ).rejects.toThrow('contraseña actual es incorrecta');
+    });
+  });
+
+  describe('confirmChangePassword', () => {
+    const userId = mockUser.id;
+    const confirmDto: ConfirmChangePasswordDto = {
+      otpCode: '123456',
+      newPassword: 'NewP@ssw0rd123!',
+    };
+
+    it('debe confirmar cambio de contraseña con OTP válido', async () => {
+      const userWithOtp = {
+        ...mockUser,
+        otpCode: '123456',
+        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        otpAttempts: 0,
+        isOtpExpired: jest.fn().mockReturnValue(false),
+      };
+
+      userRepository.findOne.mockResolvedValue(userWithOtp as User);
+      userRepository.save.mockResolvedValue({
+        ...userWithOtp,
+        password: 'newHashedPassword',
+        otpCode: null,
+      } as User);
+      jest
+        .spyOn(bcrypt, 'hash')
+        .mockResolvedValue('newHashedPassword' as never);
+
+      const result = await service.confirmChangePassword(userId, confirmDto);
+
+      expect(result.message).toContain('cambiada exitosamente');
+      expect(userRepository.save).toHaveBeenCalled();
+    });
+
+    it('debe lanzar NotFoundException si el usuario no existe', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe lanzar BadRequestException si no hay OTP pendiente', async () => {
+      const userWithoutOtp = {
+        ...mockUser,
+        otpCode: null,
+        otpExpiresAt: null,
+      };
+
+      userRepository.findOne.mockResolvedValue(userWithoutOtp as User);
+
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(
+        'No hay una solicitud de cambio de contraseña pendiente',
+      );
+    });
+
+    it('debe lanzar BadRequestException si el OTP expiró', async () => {
+      const userWithExpiredOtp = {
+        ...mockUser,
+        otpCode: '123456',
+        otpExpiresAt: new Date(Date.now() - 1000),
+        isOtpExpired: jest.fn().mockReturnValue(true),
+      };
+
+      userRepository.findOne.mockResolvedValue(userWithExpiredOtp as User);
+
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow('código OTP ha expirado');
+    });
+
+    it('debe lanzar BadRequestException si se excedieron los intentos', async () => {
+      const userWithMaxAttempts = {
+        ...mockUser,
+        otpCode: '123456',
+        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        otpAttempts: 3,
+        isOtpExpired: jest.fn().mockReturnValue(false),
+      };
+
+      userRepository.findOne.mockResolvedValue(userWithMaxAttempts as User);
+
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow('excedido el número máximo de intentos');
+    });
+
+    it('debe incrementar intentos si el OTP es incorrecto', async () => {
+      const userWithWrongOtp = {
+        ...mockUser,
+        otpCode: '654321',
+        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        otpAttempts: 0,
+        isOtpExpired: jest.fn().mockReturnValue(false),
+      };
+
+      userRepository.findOne.mockResolvedValue(userWithWrongOtp as User);
+      userRepository.save.mockResolvedValue({
+        ...userWithWrongOtp,
+        otpAttempts: 1,
+      } as User);
+
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.confirmChangePassword(userId, confirmDto),
+      ).rejects.toThrow('Código OTP incorrecto');
+      expect(userRepository.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('getMcpScopes', () => {
+    it('debe retornar todos los scopes disponibles', () => {
+      const result = service.getMcpScopes(mockUser);
+
+      expect(result).toHaveProperty('scopes');
+      expect(Array.isArray(result.scopes)).toBe(true);
+      expect(result.scopes).toContain('tasks:read');
+      expect(result.scopes).toContain('tasks:write');
+      expect(result.scopes).toContain('projects:read');
+      expect(result.scopes).toContain('organizations:read');
+      expect(result.scopes).toContain('search');
+    });
+
+    it('debe retornar scopes como array de strings', () => {
+      const result = service.getMcpScopes(mockUser);
+
+      result.scopes.forEach((scope) => {
+        expect(typeof scope).toBe('string');
+      });
     });
   });
 });
