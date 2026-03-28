@@ -206,7 +206,10 @@ describe('TasksService', () => {
         projectId: 'project-1',
       };
       const defaultStatus = { id: 'status-default', name: 'Por hacer' };
-      const createdTask = mockTask({ title: dto.title, statusId: defaultStatus.id });
+      const createdTask = mockTask({
+        title: dto.title,
+        statusId: defaultStatus.id,
+      });
 
       mockTaskStatusesService.getDefaultStatus.mockResolvedValue(defaultStatus);
       mockTaskRepository.create.mockReturnValue(createdTask);
@@ -214,7 +217,9 @@ describe('TasksService', () => {
 
       const result = await service.create(dto, user);
 
-      expect(mockTaskStatusesService.getDefaultStatus).toHaveBeenCalledWith('project-1');
+      expect(mockTaskStatusesService.getDefaultStatus).toHaveBeenCalledWith(
+        'project-1',
+      );
       expect(mockTaskRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Nueva tarea',
@@ -254,7 +259,9 @@ describe('TasksService', () => {
       };
       const createdTask = mockTask({ id: 'task-new', title: dto.title });
 
-      mockTaskStatusesService.getDefaultStatus.mockResolvedValue({ id: 'status-1' });
+      mockTaskStatusesService.getDefaultStatus.mockResolvedValue({
+        id: 'status-1',
+      });
       mockTaskRepository.create.mockReturnValue(createdTask);
       mockTaskRepository.save.mockResolvedValue(createdTask);
       mockTaskAssigneeRepository.delete.mockResolvedValue(undefined);
@@ -311,7 +318,10 @@ describe('TasksService', () => {
         projectId: 'project-1',
         statusId: 'custom-status',
       };
-      const createdTask = mockTask({ title: dto.title, statusId: 'custom-status' });
+      const createdTask = mockTask({
+        title: dto.title,
+        statusId: 'custom-status',
+      });
 
       mockTaskRepository.create.mockReturnValue(createdTask);
       mockTaskRepository.save.mockResolvedValue(createdTask);
@@ -442,10 +452,9 @@ describe('TasksService', () => {
 
       const result = await service.findDailyTasks('user-1', '2026-03-28');
 
-      expect(mainQb.andWhere).toHaveBeenCalledWith(
-        't.scheduledDate = :date',
-        { date: '2026-03-28' },
-      );
+      expect(mainQb.andWhere).toHaveBeenCalledWith('t.scheduledDate = :date', {
+        date: '2026-03-28',
+      });
       expect(result).toHaveLength(1);
     });
 
@@ -466,7 +475,9 @@ describe('TasksService', () => {
 
       expect(mainQb.andWhere).toHaveBeenCalledWith(
         't.scheduledDate = :date',
-        expect.objectContaining({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
+        expect.objectContaining({
+          date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        }),
       );
     });
   });
@@ -547,12 +558,41 @@ describe('TasksService', () => {
       mockTaskRepository.findOne.mockResolvedValue(existing);
       // First call: getTaskAssignees for old assignees (before update)
       // Second call: getTaskAssignees for final result
-      mockTaskAssigneeRepository.find.mockResolvedValueOnce([
-        { taskId: 'task-1', userId: 'user-old', user: { id: 'user-old', firstName: 'Old', lastName: 'User', email: 'old@test.com' } },
-      ]).mockResolvedValueOnce([
-        { taskId: 'task-1', userId: 'user-2', user: { id: 'user-2', firstName: 'A', lastName: 'B', email: 'a@test.com' } },
-        { taskId: 'task-1', userId: 'user-3', user: { id: 'user-3', firstName: 'C', lastName: 'D', email: 'c@test.com' } },
-      ]);
+      mockTaskAssigneeRepository.find
+        .mockResolvedValueOnce([
+          {
+            taskId: 'task-1',
+            userId: 'user-old',
+            user: {
+              id: 'user-old',
+              firstName: 'Old',
+              lastName: 'User',
+              email: 'old@test.com',
+            },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            taskId: 'task-1',
+            userId: 'user-2',
+            user: {
+              id: 'user-2',
+              firstName: 'A',
+              lastName: 'B',
+              email: 'a@test.com',
+            },
+          },
+          {
+            taskId: 'task-1',
+            userId: 'user-3',
+            user: {
+              id: 'user-3',
+              firstName: 'C',
+              lastName: 'D',
+              email: 'c@test.com',
+            },
+          },
+        ]);
       mockTaskAssigneeRepository.delete.mockResolvedValue(undefined);
       mockTaskAssigneeRepository.create.mockImplementation((data) => data);
       mockTaskAssigneeRepository.save.mockResolvedValue(undefined);
@@ -580,7 +620,7 @@ describe('TasksService', () => {
       mockTaskRepository.findOne.mockResolvedValue(existing);
       mockTaskStatusesService.findById
         .mockResolvedValueOnce(completedStatus) // first call in update for isCompleted check
-        .mockResolvedValueOnce(oldStatus)       // old status in event emission
+        .mockResolvedValueOnce(oldStatus) // old status in event emission
         .mockResolvedValueOnce(completedStatus); // new status in event emission
       mockTaskRepository.save.mockImplementation(async (task) => task);
       mockTaskAssigneeRepository.find.mockResolvedValue([]);
@@ -643,7 +683,9 @@ describe('TasksService', () => {
       // findById for parent
       mockTaskRepository.findOne.mockResolvedValueOnce(parent);
       // create() inside createSubtask calls getDefaultStatus + create + save
-      mockTaskStatusesService.getDefaultStatus.mockResolvedValue({ id: 'status-1' });
+      mockTaskStatusesService.getDefaultStatus.mockResolvedValue({
+        id: 'status-1',
+      });
       mockTaskRepository.create.mockReturnValue(subtask);
       mockTaskRepository.save.mockResolvedValue(subtask);
       // getTaskAssignees for parent (for event emission)
@@ -713,7 +755,11 @@ describe('TasksService', () => {
     it('debe emitir subtask.created a los asignados del padre', async () => {
       const parent = mockTask({ id: 'parent-1' });
       const dto: CreateTaskDto = { title: 'Subtarea con evento' };
-      const subtask = mockTask({ id: 'sub-1', parentId: 'parent-1', title: 'Subtarea con evento' });
+      const subtask = mockTask({
+        id: 'sub-1',
+        parentId: 'parent-1',
+        title: 'Subtarea con evento',
+      });
 
       mockTaskRepository.findOne.mockResolvedValueOnce(parent);
       mockTaskStatusesService.getDefaultStatus.mockResolvedValue({ id: 's' });
@@ -721,7 +767,16 @@ describe('TasksService', () => {
       mockTaskRepository.save.mockResolvedValue(subtask);
       // getTaskAssignees for parent (subtask.created event)
       mockTaskAssigneeRepository.find.mockResolvedValue([
-        { taskId: 'parent-1', userId: 'user-2', user: { id: 'user-2', firstName: 'A', lastName: 'B', email: 'a@test.com' } },
+        {
+          taskId: 'parent-1',
+          userId: 'user-2',
+          user: {
+            id: 'user-2',
+            firstName: 'A',
+            lastName: 'B',
+            email: 'a@test.com',
+          },
+        },
       ]);
 
       await service.createSubtask('parent-1', dto, user);
@@ -785,9 +840,7 @@ describe('TasksService', () => {
     it('debe hacer rollback en caso de error', async () => {
       const items = [{ id: 'task-1', position: 0 }];
       mockTaskStatusesService.findByIds.mockResolvedValue([]);
-      mockQueryRunner.manager.update.mockRejectedValue(
-        new Error('DB error'),
-      );
+      mockQueryRunner.manager.update.mockRejectedValue(new Error('DB error'));
 
       await expect(service.bulkUpdatePositions(items)).rejects.toThrow(
         'DB error',
@@ -1048,9 +1101,7 @@ describe('TasksService', () => {
     });
 
     it('debe lanzar NotFoundException si alguna tarea no existe', async () => {
-      mockTaskRepository.findBy.mockResolvedValue([
-        mockTask({ id: 'task-1' }),
-      ]);
+      mockTaskRepository.findBy.mockResolvedValue([mockTask({ id: 'task-1' })]);
 
       await expect(
         service.verifyBulkEditAccess(['task-1', 'task-2'], 'user-1'),
@@ -1059,8 +1110,16 @@ describe('TasksService', () => {
 
     it('debe verificar acceso por proyecto para tareas con projectId', async () => {
       const tasks = [
-        mockTask({ id: 'task-1', projectId: 'project-1', createdById: 'other-user' }),
-        mockTask({ id: 'task-2', projectId: 'project-1', createdById: 'other-user' }),
+        mockTask({
+          id: 'task-1',
+          projectId: 'project-1',
+          createdById: 'other-user',
+        }),
+        mockTask({
+          id: 'task-2',
+          projectId: 'project-1',
+          createdById: 'other-user',
+        }),
       ];
       mockTaskRepository.findBy.mockResolvedValue(tasks);
       mockProjectsService.getMemberRole.mockResolvedValue(ProjectRole.ADMIN);
@@ -1086,7 +1145,11 @@ describe('TasksService', () => {
 
     it('debe lanzar ForbiddenException si viewer intenta editar', async () => {
       const tasks = [
-        mockTask({ id: 'task-1', projectId: 'project-1', createdById: 'other-user' }),
+        mockTask({
+          id: 'task-1',
+          projectId: 'project-1',
+          createdById: 'other-user',
+        }),
       ];
       mockTaskRepository.findBy.mockResolvedValue(tasks);
       mockProjectsService.getMemberRole.mockResolvedValue(ProjectRole.VIEWER);
@@ -1245,7 +1308,12 @@ describe('TasksService', () => {
         {
           taskId: 'sub-1',
           userId: 'user-2',
-          user: { id: 'user-2', firstName: 'A', lastName: 'B', email: 'a@test.com' },
+          user: {
+            id: 'user-2',
+            firstName: 'A',
+            lastName: 'B',
+            email: 'a@test.com',
+          },
         },
       ]);
 
@@ -1311,10 +1379,9 @@ describe('TasksService', () => {
 
       await service.findAll({ projectId: 'project-1', statusId: 'status-1' });
 
-      expect(mainQb.andWhere).toHaveBeenCalledWith(
-        't.statusId = :statusId',
-        { statusId: 'status-1' },
-      );
+      expect(mainQb.andWhere).toHaveBeenCalledWith('t.statusId = :statusId', {
+        statusId: 'status-1',
+      });
     });
 
     it('debe retornar data vacia si no hay tareas', async () => {

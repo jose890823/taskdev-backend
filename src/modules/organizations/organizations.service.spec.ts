@@ -279,9 +279,9 @@ describe('OrganizationsService', () => {
     it('debe lanzar NotFoundException si la organizacion no existe', async () => {
       orgRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.remove('non-existent', mockUser.id),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.remove('non-existent', mockUser.id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('debe lanzar ForbiddenException si el usuario no es el owner', async () => {

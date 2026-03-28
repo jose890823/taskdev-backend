@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Repository, DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CommentsService } from './comments.service';
@@ -79,8 +76,7 @@ describe('CommentsService', () => {
 
     const mockDataSource = {
       getRepository: jest.fn().mockImplementation((entity) => {
-        const entityName =
-          typeof entity === 'function' ? entity.name : entity;
+        const entityName = typeof entity === 'function' ? entity.name : entity;
         if (entityName === 'Task') return mockTaskRepo;
         if (entityName === 'TaskAssignee') return mockAssigneeRepo;
         return {};
@@ -136,12 +132,8 @@ describe('CommentsService', () => {
       commentRepository.create.mockReturnValue(newComment as Comment);
       commentRepository.save.mockResolvedValue(newComment as Comment);
       // markAsRead — existing read entry
-      taskCommentReadRepository.findOne.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
-      taskCommentReadRepository.save.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
+      taskCommentReadRepository.findOne.mockResolvedValue(mockTaskCommentRead);
+      taskCommentReadRepository.save.mockResolvedValue(mockTaskCommentRead);
 
       const result = await service.create(createDto, mockUser);
 
@@ -156,15 +148,11 @@ describe('CommentsService', () => {
     });
 
     it('debe auto-marcar como leído para el autor al crear', async () => {
-      commentRepository.create.mockReturnValue(mockComment as Comment);
-      commentRepository.save.mockResolvedValue(mockComment as Comment);
+      commentRepository.create.mockReturnValue(mockComment);
+      commentRepository.save.mockResolvedValue(mockComment);
       taskCommentReadRepository.findOne.mockResolvedValue(null);
-      taskCommentReadRepository.create.mockReturnValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
-      taskCommentReadRepository.save.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
+      taskCommentReadRepository.create.mockReturnValue(mockTaskCommentRead);
+      taskCommentReadRepository.save.mockResolvedValue(mockTaskCommentRead);
 
       await service.create(createDto, mockUser);
 
@@ -196,12 +184,8 @@ describe('CommentsService', () => {
       };
       commentRepository.createQueryBuilder.mockReturnValue(mockQb as any);
       // markAsRead when currentUserId provided
-      taskCommentReadRepository.findOne.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
-      taskCommentReadRepository.save.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
+      taskCommentReadRepository.findOne.mockResolvedValue(mockTaskCommentRead);
+      taskCommentReadRepository.save.mockResolvedValue(mockTaskCommentRead);
 
       const result = await service.findByTask('task-uuid-1', mockUser.id);
 
@@ -300,17 +284,15 @@ describe('CommentsService', () => {
 
       await service.remove(mockComment.id, mockUser.id);
 
-      expect(commentRepository.softDelete).toHaveBeenCalledWith(
-        mockComment.id,
-      );
+      expect(commentRepository.softDelete).toHaveBeenCalledWith(mockComment.id);
     });
 
     it('debe lanzar NotFoundException si el comentario no existe', async () => {
       commentRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.remove('non-existent', mockUser.id),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.remove('non-existent', mockUser.id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('debe lanzar ForbiddenException si el usuario no es el autor', async () => {
@@ -327,12 +309,8 @@ describe('CommentsService', () => {
 
   describe('markAsRead', () => {
     it('debe actualizar lastReadAt si ya existe un registro de lectura', async () => {
-      taskCommentReadRepository.findOne.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
-      taskCommentReadRepository.save.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
+      taskCommentReadRepository.findOne.mockResolvedValue(mockTaskCommentRead);
+      taskCommentReadRepository.save.mockResolvedValue(mockTaskCommentRead);
 
       await service.markAsRead('task-uuid-1', mockUser.id);
 
@@ -344,12 +322,8 @@ describe('CommentsService', () => {
 
     it('debe crear un nuevo registro de lectura si no existe', async () => {
       taskCommentReadRepository.findOne.mockResolvedValue(null);
-      taskCommentReadRepository.create.mockReturnValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
-      taskCommentReadRepository.save.mockResolvedValue(
-        mockTaskCommentRead as TaskCommentRead,
-      );
+      taskCommentReadRepository.create.mockReturnValue(mockTaskCommentRead);
+      taskCommentReadRepository.save.mockResolvedValue(mockTaskCommentRead);
 
       await service.markAsRead('task-uuid-1', mockUser.id);
 

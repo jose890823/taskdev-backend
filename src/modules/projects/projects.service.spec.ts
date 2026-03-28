@@ -146,9 +146,9 @@ describe('ProjectsService', () => {
             ...data,
             id: mockProjectId,
           })),
-          save: jest.fn().mockImplementation((entity) =>
-            Promise.resolve(entity),
-          ),
+          save: jest
+            .fn()
+            .mockImplementation((entity) => Promise.resolve(entity)),
         };
         return cb(manager);
       });
@@ -175,9 +175,9 @@ describe('ProjectsService', () => {
             ...data,
             id: mockProjectId,
           })),
-          save: jest.fn().mockImplementation((entity) =>
-            Promise.resolve(entity),
-          ),
+          save: jest
+            .fn()
+            .mockImplementation((entity) => Promise.resolve(entity)),
         };
         return cb(manager);
       });
@@ -198,7 +198,7 @@ describe('ProjectsService', () => {
       };
 
       projectRepository.findOne.mockResolvedValue(parentProject as Project);
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       const savedChild = {
         ...mockProject,
@@ -246,9 +246,7 @@ describe('ProjectsService', () => {
         parentId: mockProjectId,
       };
 
-      projectRepository.findOne.mockResolvedValue(
-        parentWithParent as Project,
-      );
+      projectRepository.findOne.mockResolvedValue(parentWithParent as Project);
 
       await expect(service.create(childDto, mockUser)).rejects.toThrow(
         BadRequestException,
@@ -309,9 +307,7 @@ describe('ProjectsService', () => {
 
       await service.findAll(mockUserId, undefined, true);
 
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'p.organizationId IS NULL',
-      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith('p.organizationId IS NULL');
     });
 
     it('debe incluir sub-proyectos si includeChildren=true', async () => {
@@ -336,9 +332,7 @@ describe('ProjectsService', () => {
   describe('findById', () => {
     it('debe retornar proyecto con meta (childCount) por UUID', async () => {
       const projectWithParent = { ...mockProject, parent: null };
-      projectRepository.findOne.mockResolvedValue(
-        projectWithParent as Project,
-      );
+      projectRepository.findOne.mockResolvedValue(projectWithParent as Project);
       projectRepository.count.mockResolvedValue(2);
 
       const result = await service.findById(mockProjectId);
@@ -408,9 +402,11 @@ describe('ProjectsService', () => {
     };
 
     it('debe actualizar el proyecto exitosamente', async () => {
-      projectRepository.findOne.mockResolvedValue({ ...mockProject } as Project);
+      projectRepository.findOne.mockResolvedValue({
+        ...mockProject,
+      } as Project);
       // verifyAdminAccess — needs member with admin/owner role
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
       projectRepository.save.mockResolvedValue({
         ...mockProject,
         ...updateDto,
@@ -432,7 +428,9 @@ describe('ProjectsService', () => {
     });
 
     it('debe lanzar ForbiddenException si no es admin del proyecto', async () => {
-      projectRepository.findOne.mockResolvedValue({ ...mockProject } as Project);
+      projectRepository.findOne.mockResolvedValue({
+        ...mockProject,
+      } as Project);
       memberRepository.findOne.mockResolvedValue({
         ...mockMember,
         role: ProjectRole.MEMBER,
@@ -444,15 +442,13 @@ describe('ProjectsService', () => {
     });
 
     it('debe lanzar BadRequestException si parentId apunta a si mismo', async () => {
-      projectRepository.findOne.mockResolvedValue({ ...mockProject } as Project);
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      projectRepository.findOne.mockResolvedValue({
+        ...mockProject,
+      } as Project);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       await expect(
-        service.update(
-          mockProjectId,
-          { parentId: mockProjectId },
-          mockUserId,
-        ),
+        service.update(mockProjectId, { parentId: mockProjectId }, mockUserId),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -461,7 +457,9 @@ describe('ProjectsService', () => {
 
   describe('remove', () => {
     it('debe eliminar el proyecto si es el dueno', async () => {
-      projectRepository.findOne.mockResolvedValue({ ...mockProject } as Project);
+      projectRepository.findOne.mockResolvedValue({
+        ...mockProject,
+      } as Project);
       (dataSource.transaction as jest.Mock).mockImplementation(async (cb) => {
         const manager = {
           update: jest.fn().mockResolvedValue(undefined),
@@ -478,9 +476,9 @@ describe('ProjectsService', () => {
     it('debe lanzar NotFoundException si el proyecto no existe', async () => {
       projectRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.remove(mockProjectId, mockUserId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.remove(mockProjectId, mockUserId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('debe lanzar ForbiddenException si no es el dueno', async () => {
@@ -489,9 +487,9 @@ describe('ProjectsService', () => {
         ownerId: 'otro-usuario-id',
       } as Project);
 
-      await expect(
-        service.remove(mockProjectId, mockUserId),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.remove(mockProjectId, mockUserId)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -513,7 +511,7 @@ describe('ProjectsService', () => {
 
       // verifyAdminAccess
       memberRepository.findOne
-        .mockResolvedValueOnce(mockMember as ProjectMember) // hasAdminAccess
+        .mockResolvedValueOnce(mockMember) // hasAdminAccess
         .mockResolvedValueOnce(null); // existing member check
 
       const newMember = {
@@ -560,7 +558,7 @@ describe('ProjectsService', () => {
 
       // verifyAdminAccess + existing member check
       memberRepository.findOne
-        .mockResolvedValueOnce(mockMember as ProjectMember) // hasAdminAccess
+        .mockResolvedValueOnce(mockMember) // hasAdminAccess
         .mockResolvedValueOnce({
           ...mockMember,
           userId: mockMemberUserId,
@@ -593,7 +591,7 @@ describe('ProjectsService', () => {
 
       // verifyAdminAccess + find member to remove
       memberRepository.findOne
-        .mockResolvedValueOnce(mockMember as ProjectMember) // hasAdminAccess
+        .mockResolvedValueOnce(mockMember) // hasAdminAccess
         .mockResolvedValueOnce({
           ...mockMember,
           id: '88888888-8888-8888-8888-888888888888',
@@ -634,7 +632,7 @@ describe('ProjectsService', () => {
 
       // verifyAdminAccess + member not found
       memberRepository.findOne
-        .mockResolvedValueOnce(mockMember as ProjectMember) // hasAdminAccess
+        .mockResolvedValueOnce(mockMember) // hasAdminAccess
         .mockResolvedValueOnce(null); // member not found
 
       await expect(
@@ -652,7 +650,7 @@ describe('ProjectsService', () => {
 
       // verifyAdminAccess + find owner member
       memberRepository.findOne
-        .mockResolvedValueOnce(mockMember as ProjectMember) // hasAdminAccess
+        .mockResolvedValueOnce(mockMember) // hasAdminAccess
         .mockResolvedValueOnce({
           ...mockMember,
           role: ProjectRole.OWNER,
@@ -660,9 +658,7 @@ describe('ProjectsService', () => {
 
       await expect(
         service.removeMember(mockProjectId, mockUserId, mockUserId),
-      ).rejects.toThrow(
-        'No se puede eliminar al dueno del proyecto',
-      );
+      ).rejects.toThrow('No se puede eliminar al dueno del proyecto');
     });
   });
 
@@ -699,7 +695,7 @@ describe('ProjectsService', () => {
 
   describe('getMemberRole', () => {
     it('debe retornar el rol del usuario en el proyecto', async () => {
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       const result = await service.getMemberRole(mockProjectId, mockUserId);
 
@@ -722,7 +718,7 @@ describe('ProjectsService', () => {
 
   describe('verifyMemberAccess', () => {
     it('debe permitir acceso si el usuario es miembro', async () => {
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       await expect(
         service.verifyMemberAccess(mockProjectId, mockUserId),
@@ -759,7 +755,7 @@ describe('ProjectsService', () => {
         { ...mockProject, id: 'child-2', parentId: mockProjectId },
       ];
 
-      projectRepository.findOne.mockResolvedValue(mockProject as Project);
+      projectRepository.findOne.mockResolvedValue(mockProject);
       projectRepository.find.mockResolvedValue(children as Project[]);
 
       const result = await service.findChildren(mockProjectId);
@@ -787,7 +783,7 @@ describe('ProjectsService', () => {
 
   describe('findBySlug', () => {
     it('debe retornar el proyecto por slug', async () => {
-      projectRepository.findOne.mockResolvedValue(mockProject as Project);
+      projectRepository.findOne.mockResolvedValue(mockProject);
 
       const result = await service.findBySlug('test-project-a1b2');
 
@@ -810,7 +806,7 @@ describe('ProjectsService', () => {
 
   describe('isMember', () => {
     it('debe retornar true si el usuario es miembro', async () => {
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       const result = await service.isMember(mockProjectId, mockUserId);
 
@@ -830,7 +826,7 @@ describe('ProjectsService', () => {
 
   describe('hasAdminAccess', () => {
     it('debe retornar true si el usuario es owner', async () => {
-      memberRepository.findOne.mockResolvedValue(mockMember as ProjectMember);
+      memberRepository.findOne.mockResolvedValue(mockMember);
 
       const result = await service.hasAdminAccess(mockProjectId, mockUserId);
 

@@ -256,9 +256,9 @@ describe('TaskStatusesService', () => {
     it('debe lanzar NotFoundException si el estado no existe', async () => {
       statusRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.update('non-existent', updateDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update('non-existent', updateDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
