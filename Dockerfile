@@ -7,11 +7,14 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 
+# Toolchain para módulos nativos (bcrypt, pdfkit, pg)
+RUN apk add --no-cache python3 make g++ libc6-compat
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# Copy package files (pnpm-workspace.yaml contiene los overrides referenciados en el lockfile)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies (shamefully-hoist for flat node_modules structure)
 RUN pnpm install --frozen-lockfile --shamefully-hoist
