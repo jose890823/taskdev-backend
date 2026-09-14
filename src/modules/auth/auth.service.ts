@@ -49,7 +49,7 @@ interface IEmailService {
     to: string;
     firstName?: string;
     resetUrl: string;
-  }): Promise<void>;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }>;
 }
 
 @Injectable()
@@ -678,12 +678,18 @@ export class AuthService {
     // Enviar email con link de reseteo
     if (this.emailService && this.emailService.isAvailable()) {
       try {
-        await this.emailService.sendPasswordResetEmail({
+        const emailResult = await this.emailService.sendPasswordResetEmail({
           to: email,
           firstName: user.firstName,
           resetUrl,
         });
-        this.logger.log(`📧 Email de reset password enviado a ${email}`);
+        if (emailResult.success) {
+          this.logger.log(`📧 Email de reset password enviado a ${email}`);
+        } else {
+          this.logger.warn(
+            `⚠️ Email de reset password no enviado a ${email}: ${emailResult.error || 'resultado fallido'}`,
+          );
+        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(`Error enviando email de reset password: ${msg}`);
@@ -692,9 +698,8 @@ export class AuthService {
     } else {
       if (process.env.NODE_ENV !== 'production') {
         this.logger.warn(
-          `[DEV] Reset token generado para ${email}: ${resetToken}`,
+          `[DEV] EmailService no disponible — email de reset password no enviado para ${email}`,
         );
-        this.logger.warn(`[DEV] Reset URL: ${resetUrl}`);
       } else {
         this.logger.error(
           `❌ EmailService no disponible en producción — Reset password para ${email} NO puede ser entregado.`,
@@ -839,15 +844,21 @@ export class AuthService {
     // Enviar OTP por email
     if (this.emailService && this.emailService.isAvailable()) {
       try {
-        await this.emailService.sendOtpEmail({
+        const emailResult = await this.emailService.sendOtpEmail({
           to: user.email,
           firstName: user.firstName,
           otpCode,
           expirationMinutes: otpExpirationMinutes,
         });
-        this.logger.log(
-          `📧 OTP para cambio de contraseña enviado a ${user.email}`,
-        );
+        if (emailResult.success) {
+          this.logger.log(
+            `📧 OTP para cambio de contraseña enviado a ${user.email}`,
+          );
+        } else {
+          this.logger.warn(
+            `⚠️ OTP para cambio de contraseña no enviado a ${user.email}: ${emailResult.error || 'resultado fallido'}`,
+          );
+        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(
@@ -857,7 +868,7 @@ export class AuthService {
     } else {
       if (process.env.NODE_ENV !== 'production') {
         this.logger.warn(
-          `[DEV] OTP cambio de contraseña para ${user.email}: ${otpCode} — EmailService no disponible`,
+          `[DEV] EmailService no disponible — OTP de cambio de contraseña no enviado para ${user.email}`,
         );
       } else {
         this.logger.error(

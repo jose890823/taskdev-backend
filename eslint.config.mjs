@@ -43,10 +43,19 @@ export default tseslint.config(
       ],
     },
   },
-  // Spec files: relax unbound-method since Jest mocks are always bound
+  // Keep strict type safety in production code; tests are validated through Jest/E2E.
+  // Jest mocks and E2E assertions use dynamic values that are incompatible with these rules.
   {
     files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-function-type': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/unbound-method': 'off',
     },
   },

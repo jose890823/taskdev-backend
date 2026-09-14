@@ -272,7 +272,7 @@ export class EmailService {
 
       // Gmail API (HTTPS)
       if (this.provider === 'gmail-api' && this.gmailApiAuth) {
-        return this.sendViaGmailApi({
+        return await this.sendViaGmailApi({
           from: `${this.brandName} <${this.gmailApiUser}>`,
           to: dto.to,
           subject: dto.subject,

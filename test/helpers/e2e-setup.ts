@@ -35,6 +35,27 @@ export interface AuthenticatedUser {
 let cachedApp: INestApplication | null = null;
 let cachedDataSource: DataSource | null = null;
 
+const e2eEmailServiceMock = {
+  isAvailable: () => true,
+  sendOtpEmail: () =>
+    Promise.resolve({
+      success: true,
+      messageId: 'e2e-email-mock',
+    }),
+  sendPasswordResetEmail: () =>
+    Promise.resolve({
+      success: true,
+      messageId: 'e2e-email-mock',
+    }),
+  sendInvitationEmail: () =>
+    Promise.resolve({
+      success: true,
+      messageId: 'e2e-email-mock',
+    }),
+  sendNotificationEmail: () => Promise.resolve(undefined),
+  sendDigestEmail: () => Promise.resolve(undefined),
+};
+
 /**
  * Creates and configures the NestJS application for E2E testing.
  * Reuses the same app instance across calls within a test suite.
@@ -44,7 +65,10 @@ export async function createE2EApp(): Promise<INestApplication> {
 
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  })
+    .overrideProvider('EmailService')
+    .useValue(e2eEmailServiceMock)
+    .compile();
 
   const app = moduleFixture.createNestApplication();
 
@@ -232,9 +256,15 @@ export async function cleanupTestData(): Promise<void> {
   await ds.query(`DELETE FROM projects`);
   await ds.query(`DELETE FROM organization_members`);
   await ds.query(`DELETE FROM organizations`);
-  await ds.query(`DELETE FROM notifications WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`);
-  await ds.query(`DELETE FROM active_sessions WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`);
-  await ds.query(`DELETE FROM user_activities WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`);
+  await ds.query(
+    `DELETE FROM notifications WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`,
+  );
+  await ds.query(
+    `DELETE FROM active_sessions WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`,
+  );
+  await ds.query(
+    `DELETE FROM user_activities WHERE "userId" IN (SELECT id FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com')`,
+  );
   // Delete test users (preserve super admin and system users)
   await ds.query(
     `DELETE FROM users WHERE "isSystemUser" = false AND email LIKE '%@test.com'`,

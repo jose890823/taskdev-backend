@@ -70,7 +70,9 @@ const PREFIX_MAP: Record<
 export class SearchService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async findByCode(code: string): Promise<{ type: string; data: any }> {
+  async findByCode(
+    code: string,
+  ): Promise<{ type: string; data: Record<string, unknown> }> {
     if (!code || code.length < 3) {
       throw new BadRequestException('Codigo invalido');
     }
