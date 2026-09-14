@@ -152,7 +152,7 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3001;
 
   try {
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {
       logger.warn(
@@ -166,7 +166,7 @@ async function bootstrap() {
       }
       // Esperar a que el puerto se libere
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      await app.listen(port);
+      await app.listen(port, '0.0.0.0');
     } else {
       throw error;
     }
