@@ -87,11 +87,7 @@ describe('Tasks (e2e)', () => {
     let taskId: string;
 
     it('1. Should create a project task (201)', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'E2E Task One',
           projectId,
@@ -112,11 +108,7 @@ describe('Tasks (e2e)', () => {
 
     it('2. Should create task with all optional fields', async () => {
       const defaultStatus = getStatus('Por hacer');
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Fully-loaded Task',
           description: 'A detailed description for this task',
@@ -141,11 +133,7 @@ describe('Tasks (e2e)', () => {
     });
 
     it('3. Should reject task without title (400)', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ projectId })
         .expect(400);
 
@@ -160,11 +148,11 @@ describe('Tasks (e2e)', () => {
       ).expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.data).toBeDefined();
-      expect(Array.isArray(res.body.data)).toBe(true);
-      expect(res.body.data.length).toBeGreaterThanOrEqual(2);
+      expect(res.body.data.data).toBeDefined();
+      expect(Array.isArray(res.body.data.data)).toBe(true);
+      expect(res.body.data.data.length).toBeGreaterThanOrEqual(2);
       // All tasks should belong to this project
-      for (const task of res.body.data) {
+      for (const task of res.body.data.data) {
         expect(task.projectId).toBe(projectId);
       }
     });
@@ -176,7 +164,7 @@ describe('Tasks (e2e)', () => {
         userAuth.tokens.accessToken,
       ).expect(200);
 
-      expect(res.body.data.length).toBe(1);
+      expect(res.body.data.data.length).toBe(1);
     });
 
     it('6. Should get task by ID', async () => {
@@ -293,11 +281,7 @@ describe('Tasks (e2e)', () => {
     beforeAll(async () => {
       // Create a task assigned to user2 with a specific status for filtering
       const inProgress = getStatus('En progreso');
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Filterable Task',
           projectId,
@@ -315,8 +299,8 @@ describe('Tasks (e2e)', () => {
         userAuth.tokens.accessToken,
       ).expect(200);
 
-      expect(res.body.data.length).toBeGreaterThan(0);
-      for (const task of res.body.data) {
+      expect(res.body.data.data.length).toBeGreaterThan(0);
+      for (const task of res.body.data.data) {
         expect(task.projectId).toBe(projectId);
       }
     });
@@ -329,8 +313,8 @@ describe('Tasks (e2e)', () => {
         userAuth.tokens.accessToken,
       ).expect(200);
 
-      expect(res.body.data.length).toBeGreaterThan(0);
-      for (const task of res.body.data) {
+      expect(res.body.data.data.length).toBeGreaterThan(0);
+      for (const task of res.body.data.data) {
         expect(task.statusId).toBe(inProgress.id);
       }
     });
@@ -342,9 +326,9 @@ describe('Tasks (e2e)', () => {
         userAuth.tokens.accessToken,
       ).expect(200);
 
-      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data.data.length).toBeGreaterThan(0);
       // Each task should have user2 in assignees
-      for (const task of res.body.data) {
+      for (const task of res.body.data.data) {
         const hasUser2 =
           task.assignees?.some(
             (a: { id: string }) => a.id === user2Auth.user.id,
@@ -377,11 +361,7 @@ describe('Tasks (e2e)', () => {
 
     beforeAll(async () => {
       // Create a parent task
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ title: 'Parent Task', projectId })
         .expect(201);
       parentTaskId = res.body.data.id;
@@ -451,11 +431,7 @@ describe('Tasks (e2e)', () => {
 
     beforeAll(async () => {
       // Create a task for comments
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ title: 'Comment Target Task', projectId })
         .expect(201);
       commentTaskId = res.body.data.id;
@@ -525,7 +501,7 @@ describe('Tasks (e2e)', () => {
       ).expect(200);
     });
 
-    it('25. Should reject updating other user\'s comment (403)', async () => {
+    it("25. Should reject updating other user's comment (403)", async () => {
       // user2 creates a comment
       const createRes = await authPost(
         app,
@@ -546,7 +522,7 @@ describe('Tasks (e2e)', () => {
         .expect(403);
     });
 
-    it('26. Should reject deleting other user\'s comment (403)', async () => {
+    it("26. Should reject deleting other user's comment (403)", async () => {
       // userAuth tries to delete user2's comment
       await authDelete(
         app,
@@ -568,11 +544,7 @@ describe('Tasks (e2e)', () => {
     let transitionTaskId: string;
 
     beforeAll(async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ title: 'Transition Task', projectId })
         .expect(201);
       transitionTaskId = res.body.data.id;
@@ -625,11 +597,7 @@ describe('Tasks (e2e)', () => {
 
   describe('Priority & Assignment', () => {
     it('31. Should create task with high priority', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ title: 'High Priority Task', projectId, priority: 'high' })
         .expect(201);
 
@@ -637,11 +605,7 @@ describe('Tasks (e2e)', () => {
     });
 
     it('32. Should create task with urgent priority', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({ title: 'Urgent Task', projectId, priority: 'urgent' })
         .expect(201);
 
@@ -754,7 +718,7 @@ describe('Tasks (e2e)', () => {
       ).expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data.data.length).toBeGreaterThan(0);
     });
 
     it('38. Non-member should not get a specific project task (403)', async () => {
@@ -780,11 +744,7 @@ describe('Tasks (e2e)', () => {
 
   describe('Daily Tasks', () => {
     it('39. Should create a daily task without projectId', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Daily Standup',
           type: 'daily',
@@ -902,11 +862,7 @@ describe('Tasks (e2e)', () => {
 
   describe('Multi-assignee Support', () => {
     it('48. Should create task with multiple assignees', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Multi-assignee Task',
           projectId,
@@ -973,7 +929,7 @@ describe('Tasks (e2e)', () => {
       ).expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data.data.length).toBeGreaterThan(0);
     });
 
     it('51. Super admin should create task in any project', async () => {

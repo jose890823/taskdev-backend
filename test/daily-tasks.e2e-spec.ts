@@ -60,9 +60,7 @@ describe('Daily Tasks (e2e)', () => {
 
     // Map statuses by name for quick reference
     statusPorHacer = globalStatuses.find((s) => s.isDefault)!;
-    statusEnProgreso = globalStatuses.find(
-      (s) => s.name === 'En progreso',
-    )!;
+    statusEnProgreso = globalStatuses.find((s) => s.name === 'En progreso')!;
     statusCompletado = globalStatuses.find((s) => s.isCompleted)!;
   });
 
@@ -93,15 +91,11 @@ describe('Daily Tasks (e2e)', () => {
       expect(porHacer!.isDefault).toBe(true);
       expect(porHacer!.isCompleted).toBe(false);
 
-      const enProgreso = globalStatuses.find(
-        (s) => s.name === 'En progreso',
-      );
+      const enProgreso = globalStatuses.find((s) => s.name === 'En progreso');
       expect(enProgreso!.isDefault).toBe(false);
       expect(enProgreso!.isCompleted).toBe(false);
 
-      const completado = globalStatuses.find(
-        (s) => s.name === 'Completado',
-      );
+      const completado = globalStatuses.find((s) => s.name === 'Completado');
       expect(completado!.isDefault).toBe(false);
       expect(completado!.isCompleted).toBe(true);
     });
@@ -113,11 +107,7 @@ describe('Daily Tasks (e2e)', () => {
 
   describe('Create Daily Tasks', () => {
     it('1. Should create a daily task without projectId (201)', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Mi tarea diaria simple',
           type: 'daily',
@@ -138,11 +128,7 @@ describe('Daily Tasks (e2e)', () => {
     it('2. Should create daily task with scheduledDate', async () => {
       const targetDate = '2026-04-15';
 
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea programada para el futuro',
           type: 'daily',
@@ -156,11 +142,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('3. Should create daily task with priority', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea urgente diaria',
           type: 'daily',
@@ -174,11 +156,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('4. Should create daily task with description', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea con descripcion',
           type: 'daily',
@@ -194,11 +172,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('5. Should reject daily task without title (400)', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           type: 'daily',
           scheduledDate: today(),
@@ -209,11 +183,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('Should create daily task with explicit statusId', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea con estado explicito',
           type: 'daily',
@@ -236,11 +206,7 @@ describe('Daily Tasks (e2e)', () => {
 
     beforeAll(async () => {
       // Create a known daily task for today to test listing
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea diaria para listar hoy',
           type: 'daily',
@@ -260,9 +226,7 @@ describe('Daily Tasks (e2e)', () => {
       expect(res.body.success).toBe(true);
       expect(Array.isArray(res.body.data)).toBe(true);
       // Should contain the task we just created
-      const found = res.body.data.find(
-        (t: any) => t.id === todayTaskId,
-      );
+      const found = res.body.data.find((t: any) => t.id === todayTaskId);
       expect(found).toBeDefined();
       expect(found.type).toBe('daily');
     });
@@ -337,9 +301,7 @@ describe('Daily Tasks (e2e)', () => {
         expect(task.type).toBe('daily');
       }
       // Should include our created task
-      const found = res.body.data.find(
-        (t: any) => t.id === todayTaskId,
-      );
+      const found = res.body.data.find((t: any) => t.id === todayTaskId);
       expect(found).toBeDefined();
     });
 
@@ -362,11 +324,7 @@ describe('Daily Tasks (e2e)', () => {
     let taskToUpdate: any;
 
     beforeAll(async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea para actualizar',
           type: 'daily',
@@ -455,11 +413,7 @@ describe('Daily Tasks (e2e)', () => {
     let taskToComplete: any;
 
     beforeAll(async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea para completar',
           type: 'daily',
@@ -611,13 +565,13 @@ describe('Daily Tasks (e2e)', () => {
       ).expect(200);
 
       // The daily task should NOT be in project-type listings
-      const found = projectList.body.data.find(
+      const found = projectList.body.data.data.find(
         (t: any) => t.id === dailyTaskId,
       );
       expect(found).toBeUndefined();
     });
 
-    it('20. Different users should NOT see each other\'s daily tasks', async () => {
+    it("20. Different users should NOT see each other's daily tasks", async () => {
       const isolationDate = '2026-12-25';
 
       // User 1 creates a daily task
@@ -671,11 +625,7 @@ describe('Daily Tasks (e2e)', () => {
 
     it('Other user should NOT be able to update my daily task', async () => {
       // User 1 creates a daily task
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Solo yo puedo editar esto',
           type: 'daily',
@@ -697,11 +647,7 @@ describe('Daily Tasks (e2e)', () => {
 
     it('Other user should NOT be able to delete my daily task', async () => {
       // User 1 creates a daily task
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Solo yo puedo borrar esto',
           type: 'daily',
@@ -753,11 +699,7 @@ describe('Daily Tasks (e2e)', () => {
 
   describe('Edge Cases', () => {
     it('Should create daily task with all optional fields', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea completa',
           type: 'daily',
@@ -866,11 +808,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('Should reject unknown properties in create body (forbidNonWhitelisted)', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea con campos extras',
           type: 'daily',
@@ -883,11 +821,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('Should generate a systemCode for daily tasks', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea con systemCode',
           type: 'daily',
@@ -900,11 +834,7 @@ describe('Daily Tasks (e2e)', () => {
     });
 
     it('Default status should be assigned when no statusId provided', async () => {
-      const res = await authPost(
-        app,
-        '/api/tasks',
-        userAuth.tokens.accessToken,
-      )
+      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Tarea sin status explicito',
           type: 'daily',
