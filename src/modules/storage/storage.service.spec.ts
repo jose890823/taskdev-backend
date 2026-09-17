@@ -20,8 +20,6 @@ describe('StorageService', () => {
   let configService: jest.Mocked<StorageConfigService>;
   let localProvider: jest.Mocked<LocalStorageProvider>;
   let s3Provider: jest.Mocked<S3StorageProvider>;
-  let gcsProvider: jest.Mocked<GCSStorageProvider>;
-  let cloudinaryProvider: jest.Mocked<CloudinaryStorageProvider>;
 
   // ── Mock data ──────────────────────────────────────────────
 
@@ -132,9 +130,7 @@ describe('StorageService', () => {
         {
           provide: StorageConfigService,
           useValue: {
-            getActiveConfig: jest
-              .fn()
-              .mockResolvedValue(createActiveConfig()),
+            getActiveConfig: jest.fn().mockResolvedValue(createActiveConfig()),
             getProviderConfig: jest.fn().mockResolvedValue({
               type: StorageProviderType.LOCAL,
               enabled: true,
@@ -158,8 +154,6 @@ describe('StorageService', () => {
     configService = module.get(StorageConfigService);
     localProvider = module.get(LocalStorageProvider);
     s3Provider = module.get(S3StorageProvider);
-    gcsProvider = module.get(GCSStorageProvider);
-    cloudinaryProvider = module.get(CloudinaryStorageProvider);
   });
 
   afterEach(() => {
@@ -629,10 +623,7 @@ describe('StorageService', () => {
       const options = { recursive: true, limit: 50 };
       await service.list('uploads/test', options);
 
-      expect(localProvider.list).toHaveBeenCalledWith(
-        'uploads/test',
-        options,
-      );
+      expect(localProvider.list).toHaveBeenCalledWith('uploads/test', options);
     });
   });
 

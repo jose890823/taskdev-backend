@@ -109,13 +109,16 @@ export class ResponseInterceptor<T> implements NestInterceptor<
   }
 
   /**
-   * Verifica si la respuesta tiene formato parcial { data, message? }
+   * Verifica si la respuesta tiene formato parcial { data, message }
+   * Requires BOTH 'data' AND 'message' to avoid false positives with
+   * domain entities that happen to have a 'data' property.
    */
   private isPartiallyFormatted(data: unknown): boolean {
     return (
       data !== null &&
       typeof data === 'object' &&
       'data' in data &&
+      'message' in data &&
       !('success' in data)
     );
   }

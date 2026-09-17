@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -170,7 +171,7 @@ export class StorageAdminController {
     // Primero validar el proveedor
     const testResult = await this.storageService.validateProvider(provider);
     if (!testResult.success) {
-      throw new Error(
+      throw new BadRequestException(
         `No se puede activar el proveedor: ${testResult.message}`,
       );
     }

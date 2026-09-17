@@ -5,8 +5,19 @@ interface OtpTemplateData {
   brandName?: string;
 }
 
+/** Escape user-controlled strings to prevent HTML injection in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function getOtpEmailTemplate(data: OtpTemplateData): string {
   const brandName = data.brandName || 'TaskHub';
+  const safeFirstName = escapeHtml(data.firstName);
 
   return `
 <!DOCTYPE html>
@@ -38,7 +49,7 @@ export function getOtpEmailTemplate(data: OtpTemplateData): string {
           <tr>
             <td style="padding: 16px 40px 40px;">
               <p style="margin: 0 0 24px; color: #94a3b8; font-size: 15px; line-height: 1.6;">
-                Hola <span style="color: #e2e8f0; font-weight: 500;">${data.firstName}</span>, usa el siguiente codigo para verificar tu cuenta en ${brandName}:
+                Hola <span style="color: #e2e8f0; font-weight: 500;">${safeFirstName}</span>, usa el siguiente codigo para verificar tu cuenta en ${brandName}:
               </p>
 
               <!-- OTP Code -->

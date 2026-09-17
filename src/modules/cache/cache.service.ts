@@ -10,8 +10,8 @@ import Redis from 'ioredis';
 /**
  * Servicio centralizado de cache con Redis (ioredis).
  *
- * Proporciona una capa de cache reutilizable para todos los modulos de MiChambita.
- * Usa el prefijo 'mchb:' para evitar colisiones con otros datos en Redis.
+ * Proporciona una capa de cache reutilizable para todos los modulos de TaskHub.
+ * Usa el prefijo 'taskhub:' para evitar colisiones con otros datos en Redis.
  */
 @Injectable()
 export class CacheService implements OnModuleDestroy {
@@ -26,7 +26,7 @@ export class CacheService implements OnModuleDestroy {
       port: configService.get<number>('REDIS_PORT', 6379),
       password: password || undefined,
       db: configService.get<number>('REDIS_DB', 0),
-      keyPrefix: 'mchb:',
+      keyPrefix: 'taskhub:',
       retryStrategy: (times: number) => Math.min(times * 50, 2000),
       maxRetriesPerRequest: 3,
       lazyConnect: false,
@@ -87,6 +87,32 @@ export class CacheService implements OnModuleDestroy {
     }
   }
 
+  /** Increment a Redis counter and assign its TTL on first write. */
+  async increment(key: string, ttlSeconds: number): Promise<number> {
+    const result = await this.incrementWithTtl(key, ttlSeconds);
+    return result.count;
+  }
+
+  /** Atomically increment a fixed-window counter and return its remaining TTL. */
+  async incrementWithTtl(
+    key: string,
+    ttlSeconds: number,
+  ): Promise<{ count: number; retryAfter: number }> {
+    const result = (await this.client.eval(
+      `local count = redis.call('INCR', KEYS[1])
+       if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+       return { count, redis.call('TTL', KEYS[1]) }`,
+      1,
+      key,
+      ttlSeconds,
+    )) as [number, number];
+
+    return {
+      count: Number(result[0]),
+      retryAfter: Math.max(1, Number(result[1]) || ttlSeconds),
+    };
+  }
+
   /**
    * Eliminar una clave del cache
    */
@@ -101,13 +127,21 @@ export class CacheService implements OnModuleDestroy {
 
   /**
    * Eliminar todas las claves que coincidan con un patron usando SCAN + DEL.
-   * El patron debe ser relativo al prefijo 'mchb:'. Ejemplo: 'categories:*'
+   * El patron debe ser relativo al prefijo (sin incluirlo). Ejemplo: 'categories:*'
+   *
+   * Nota sobre ioredis keyPrefix:
+   * - SCAN no aplica keyPrefix automaticamente (no es un comando con key como 1er arg)
+   *   → debemos incluir el prefijo en el MATCH pattern manualmente
+   * - DEL si aplica keyPrefix automaticamente
+   *   → debemos quitar el prefijo de las keys retornadas por SCAN antes de pasarlas a DEL
+   *
    * @returns Cantidad de claves eliminadas
    */
   async delByPattern(pattern: string): Promise<number> {
     try {
       let deletedCount = 0;
-      const fullPattern = `mchb:${pattern}`;
+      const prefix = 'taskhub:';
+      const fullPattern = `${prefix}${pattern}`;
       let cursor = '0';
 
       do {
@@ -121,11 +155,11 @@ export class CacheService implements OnModuleDestroy {
         cursor = nextCursor;
 
         if (keys.length > 0) {
-          // Las claves retornadas por SCAN incluyen el prefijo completo,
-          // pero el cliente ioredis con keyPrefix agrega automaticamente el prefijo.
-          // Necesitamos remover el prefijo para que ioredis no lo duplique.
+          // SCAN retorna keys con el prefijo completo (ej: 'taskhub:tasks:1').
+          // DEL aplica keyPrefix automaticamente, asi que debemos quitar el prefijo
+          // para evitar duplicacion (taskhub: + taskhub:key).
           const keysWithoutPrefix = keys.map((k) =>
-            k.startsWith('mchb:') ? k.substring(6) : k,
+            k.startsWith(prefix) ? k.substring(prefix.length) : k,
           );
           await this.client.del(...keysWithoutPrefix);
           deletedCount += keys.length;
@@ -213,16 +247,16 @@ export class CacheService implements OnModuleDestroy {
   // CONSTRUCTORES DE CLAVES (ESTATICOS)
   // ============================================
 
-  static keys = {
-    category: (id: string) => `categories:${id}`,
-    categoryTree: () => 'categories:tree',
-    product: (id: string) => `products:${id}`,
-    productList: (hash: string) => `products:list:${hash}`,
-    store: (id: string) => `stores:${id}`,
+  static readonly keys = {
+    task: (id: string) => `tasks:${id}`,
+    taskList: (hash: string) => `tasks:list:${hash}`,
+    project: (id: string) => `projects:${id}`,
+    projectList: (hash: string) => `projects:list:${hash}`,
+    organization: (id: string) => `organizations:${id}`,
+    user: (id: string) => `users:${id}`,
     featureFlag: (key: string) => `flags:${key}`,
-    featureFlagsAll: () => 'flags:all',
-    shippingZones: (storeId: string) => `shipping:zones:${storeId}`,
-    commissionRule: (storeId: string) => `commissions:rule:${storeId}`,
+    taskStatus: (projectId: string) => `statuses:${projectId}`,
+    notification: (userId: string) => `notifications:${userId}`,
   };
 
   // ============================================
@@ -276,11 +310,12 @@ export class CacheService implements OnModuleDestroy {
    * SCAN-based para no bloquear Redis.
    * @param pattern - Patron glob (ej: 'products:*')
    * @param limit - Limite maximo de claves a retornar (por defecto 100)
-   * @returns Lista de claves (sin el prefijo mchb:)
+   * @returns Lista de claves (sin el prefijo taskhub:)
    */
   async listKeys(pattern: string, limit: number = 100): Promise<string[]> {
     try {
-      const fullPattern = `mchb:${pattern}`;
+      const prefix = 'taskhub:';
+      const fullPattern = `${prefix}${pattern}`;
       const result: string[] = [];
       let cursor = '0';
 
@@ -295,7 +330,9 @@ export class CacheService implements OnModuleDestroy {
         cursor = nextCursor;
 
         for (const key of keys) {
-          const cleanKey = key.startsWith('mchb:') ? key.substring(6) : key;
+          const cleanKey = key.startsWith(prefix)
+            ? key.substring(prefix.length)
+            : key;
           result.push(cleanKey);
           if (result.length >= limit) {
             return result;

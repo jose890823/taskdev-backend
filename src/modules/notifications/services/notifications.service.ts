@@ -72,6 +72,7 @@ export class NotificationsService {
 
       notification = this.notificationRepository.create({
         userId: dto.userId,
+        projectId: dto.projectId || null,
         type: dto.type,
         channel: NotificationChannel.IN_APP,
         priority: dto.priority || NotificationPriority.NORMAL,
@@ -147,9 +148,12 @@ export class NotificationsService {
       totalPages: number;
     };
   }> {
-    const { type, status, isRead, page = 1, limit = 20 } = query;
+    const { type, status, isRead, page = 1, limit = 20, projectId } = query;
 
-    const where: FindOptionsWhere<Notification> = { userId };
+    const where: FindOptionsWhere<Notification> = {
+      userId,
+      ...(projectId ? { projectId } : {}),
+    };
 
     if (type) where.type = type;
     if (status) where.status = status;
@@ -163,7 +167,7 @@ export class NotificationsService {
     });
 
     const unreadCount = await this.notificationRepository.count({
-      where: { userId, isRead: false },
+      where: { ...where, isRead: false },
     });
 
     return {
@@ -176,9 +180,13 @@ export class NotificationsService {
   /**
    * Obtener notificación por ID (filtrada por userId para evitar IDOR)
    */
-  async findById(id: string, userId: string): Promise<Notification> {
+  async findById(
+    id: string,
+    userId: string,
+    projectId?: string,
+  ): Promise<Notification> {
     const notification = await this.notificationRepository.findOne({
-      where: { id, userId },
+      where: { id, userId, ...(projectId ? { projectId } : {}) },
     });
 
     if (!notification) {
@@ -194,9 +202,9 @@ export class NotificationsService {
   /**
    * Obtener conteo de no leídas
    */
-  async getUnreadCount(userId: string): Promise<number> {
+  async getUnreadCount(userId: string, projectId?: string): Promise<number> {
     return this.notificationRepository.count({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, ...(projectId ? { projectId } : {}) },
     });
   }
 
@@ -207,9 +215,13 @@ export class NotificationsService {
   /**
    * Marcar notificación como leída
    */
-  async markAsRead(id: string, userId: string): Promise<Notification> {
+  async markAsRead(
+    id: string,
+    userId: string,
+    projectId?: string,
+  ): Promise<Notification> {
     const notification = await this.notificationRepository.findOne({
-      where: { id, userId },
+      where: { id, userId, ...(projectId ? { projectId } : {}) },
     });
 
     if (!notification) {
@@ -226,9 +238,9 @@ export class NotificationsService {
   /**
    * Marcar todas como leídas
    */
-  async markAllAsRead(userId: string): Promise<number> {
+  async markAllAsRead(userId: string, projectId?: string): Promise<number> {
     const result = await this.notificationRepository.update(
-      { userId, isRead: false },
+      { userId, isRead: false, ...(projectId ? { projectId } : {}) },
       { isRead: true, readAt: new Date(), status: NotificationStatus.READ },
     );
 
@@ -241,9 +253,18 @@ export class NotificationsService {
   /**
    * Marcar múltiples como leídas
    */
-  async markManyAsRead(ids: string[], userId: string): Promise<number> {
+  async markManyAsRead(
+    ids: string[],
+    userId: string,
+    projectId?: string,
+  ): Promise<number> {
     const result = await this.notificationRepository.update(
-      { id: In(ids), userId, isRead: false },
+      {
+        id: In(ids),
+        userId,
+        isRead: false,
+        ...(projectId ? { projectId } : {}),
+      },
       { isRead: true, readAt: new Date(), status: NotificationStatus.READ },
     );
 
@@ -257,8 +278,12 @@ export class NotificationsService {
   /**
    * Eliminar notificación
    */
-  async delete(id: string, userId: string): Promise<void> {
-    const result = await this.notificationRepository.delete({ id, userId });
+  async delete(id: string, userId: string, projectId?: string): Promise<void> {
+    const result = await this.notificationRepository.delete({
+      id,
+      userId,
+      ...(projectId ? { projectId } : {}),
+    });
 
     if (result.affected === 0) {
       throw new NotFoundException({
@@ -271,10 +296,11 @@ export class NotificationsService {
   /**
    * Eliminar todas las leídas
    */
-  async deleteAllRead(userId: string): Promise<number> {
+  async deleteAllRead(userId: string, projectId?: string): Promise<number> {
     const result = await this.notificationRepository.delete({
       userId,
       isRead: true,
+      ...(projectId ? { projectId } : {}),
     });
 
     return result.affected || 0;
@@ -307,11 +333,30 @@ export class NotificationsService {
     });
 
     if (!preferences) {
-      preferences = this.preferenceRepository.create({ userId });
-      preferences = await this.preferenceRepository.save(preferences);
-      this.logger.log(
-        `Preferencias de notificación creadas para usuario ${userId}`,
-      );
+      try {
+        preferences = await this.preferenceRepository.save(
+          this.preferenceRepository.create({ userId }),
+        );
+        this.logger.log(
+          `Preferencias de notificación creadas para usuario ${userId}`,
+        );
+      } catch (error: unknown) {
+        // Unique constraint violation — another request created it first
+        /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- TypeORM error codes are untyped */
+        const errCode =
+          (error as any)?.code ?? (error as any)?.driverError?.code;
+        /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+        if (errCode === '23505') {
+          preferences = await this.preferenceRepository.findOne({
+            where: { userId },
+          });
+          if (!preferences) {
+            throw error; // Should not happen, but be safe
+          }
+        } else {
+          throw error;
+        }
+      }
     }
 
     return preferences;
@@ -481,6 +526,7 @@ export class NotificationsService {
     if (preferences.emailFrequency === 'instant') {
       await this.notificationQueue.add('send-email', {
         userId: dto.userId,
+        projectId: dto.projectId,
         type: dto.type,
         title: dto.title,
         message: dto.message,

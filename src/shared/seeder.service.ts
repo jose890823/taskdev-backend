@@ -43,6 +43,14 @@ export class SeederService implements OnApplicationBootstrap {
       const tableExists = await this.checkTableExists('users');
 
       if (!tableExists) {
+        if (process.env.NODE_ENV === 'production') {
+          this.logger.error(
+            'Tables not found in production. Run migrations first.',
+          );
+          throw new Error(
+            'Database tables not found. Run migrations before starting in production.',
+          );
+        }
         this.logger.log(
           'Tablas no encontradas. Sincronizando esquema de base de datos...',
         );
@@ -84,28 +92,41 @@ export class SeederService implements OnApplicationBootstrap {
    * Crea el Super Admin por defecto si no existe
    */
   private async seedSuperAdmin(): Promise<void> {
-    const superAdminEmail = this.configService.get<string>(
-      'SUPER_ADMIN_EMAIL',
-      'admin@taskhub.com',
-    );
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    const superAdminEmail = this.configService.get<string>('SUPER_ADMIN_EMAIL');
+    if (!superAdminEmail && isProduction) {
+      this.logger.error(
+        'SUPER_ADMIN_EMAIL must be set in production environment',
+      );
+      throw new Error('SUPER_ADMIN_EMAIL is required in production');
+    }
+    const finalEmail = superAdminEmail || 'admin@taskhub.com';
+
     const superAdminPassword = this.configService.get<string>(
       'SUPER_ADMIN_PASSWORD',
-      'Admin123!',
     );
+    if (!superAdminPassword && isProduction) {
+      this.logger.error(
+        'SUPER_ADMIN_PASSWORD must be set in production environment',
+      );
+      throw new Error('SUPER_ADMIN_PASSWORD is required in production');
+    }
+    const finalPassword = superAdminPassword || 'Admin123!';
 
     const existingSuperAdmin = await this.userRepository.findOne({
-      where: { email: superAdminEmail },
+      where: { email: finalEmail },
     });
 
     if (existingSuperAdmin) {
-      this.logger.log(`Super Admin ya existe: ${superAdminEmail}`);
+      this.logger.log(`Super Admin ya existe: ${finalEmail}`);
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(superAdminPassword, 10);
+    const hashedPassword = await bcrypt.hash(finalPassword, 10);
 
     const superAdmin = this.userRepository.create({
-      email: superAdminEmail,
+      email: finalEmail,
       password: hashedPassword,
       firstName: 'Super',
       lastName: 'Admin',
@@ -117,7 +138,7 @@ export class SeederService implements OnApplicationBootstrap {
     });
 
     await this.userRepository.save(superAdmin);
-    this.logger.log(`Super Admin creado: ${superAdminEmail}`);
+    this.logger.log(`Super Admin creado: ${finalEmail}`);
   }
 
   /**

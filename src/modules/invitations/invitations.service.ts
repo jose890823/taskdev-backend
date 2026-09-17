@@ -15,9 +15,15 @@ import { randomBytes } from 'crypto';
 import { Invitation, InvitationStatus } from './entities/invitation.entity';
 import { CreateInvitationDto, CreateProjectInvitationDto } from './dto';
 import { OrganizationsService } from '../organizations/organizations.service';
-import { OrganizationRole } from '../organizations/entities/organization-member.entity';
+import {
+  OrganizationMember,
+  OrganizationRole,
+} from '../organizations/entities/organization-member.entity';
 import { ProjectsService } from '../projects/projects.service';
-import { ProjectRole } from '../projects/entities/project-member.entity';
+import {
+  ProjectMember,
+  ProjectRole,
+} from '../projects/entities/project-member.entity';
 import { User, UserRole } from '../auth/entities/user.entity';
 import type {
   SendInvitationEmailDto,
@@ -367,37 +373,47 @@ export class InvitationsService {
       throw new BadRequestException('La invitacion ha expirado');
     }
 
-    if (invitation.email !== user.email) {
+    if (invitation.email.toLowerCase() !== user.email.toLowerCase()) {
       throw new BadRequestException(
         'Esta invitacion no corresponde a tu email',
       );
     }
 
     await this.dataSource.transaction(async (manager) => {
-      // Agregar a organizacion
-      try {
-        await this.organizationsService.addMember(
-          invitation.organizationId,
-          { userId: user.id, role: invitation.role as OrganizationRole },
-          invitation.invitedById,
-        );
-      } catch (e) {
-        if (!(e instanceof ConflictException)) throw e;
+      // Agregar a organizacion — use transaction manager directly so it's atomic
+      const existingOrgMember = await manager.findOne(OrganizationMember, {
+        where: {
+          organizationId: invitation.organizationId,
+          userId: user.id,
+        },
+      });
+      if (!existingOrgMember) {
+        const orgMember = manager.create(OrganizationMember, {
+          organizationId: invitation.organizationId,
+          userId: user.id,
+          role: invitation.role as OrganizationRole,
+        });
+        await manager.save(orgMember);
       }
 
-      // Si es invitacion de proyecto, agregar al proyecto tambien
+      // Si es invitacion de proyecto, agregar al proyecto tambien — within same transaction
       if (invitation.projectId && invitation.projectRole) {
-        try {
-          await this.projectsService.addMemberByUserId(
-            invitation.projectId,
-            user.id,
-            invitation.projectRole as ProjectRole,
-          );
+        const existingProjectMember = await manager.findOne(ProjectMember, {
+          where: {
+            projectId: invitation.projectId,
+            userId: user.id,
+          },
+        });
+        if (!existingProjectMember) {
+          const projectMember = manager.create(ProjectMember, {
+            projectId: invitation.projectId,
+            userId: user.id,
+            role: invitation.projectRole as ProjectRole,
+          });
+          await manager.save(projectMember);
           this.logger.log(
             `Usuario ${user.email} agregado al proyecto ${invitation.projectId}`,
           );
-        } catch (e) {
-          if (!(e instanceof ConflictException)) throw e;
         }
       }
 
@@ -464,12 +480,16 @@ export class InvitationsService {
           return { message: `Invitacion reenviada a ${invitation.email}` };
         }
         this.logger.warn(`⚠️ No se pudo reenviar email a ${invitation.email}`);
-        return { message: 'Invitacion renovada pero no se pudo enviar el email' };
+        return {
+          message: 'Invitacion renovada pero no se pudo enviar el email',
+        };
       } catch (error: unknown) {
         this.logger.warn(
           `⚠️ Error reenviando email a ${invitation.email}: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return { message: 'Invitacion renovada pero no se pudo enviar el email' };
+        return {
+          message: 'Invitacion renovada pero no se pudo enviar el email',
+        };
       }
     }
 
@@ -500,6 +520,10 @@ export class InvitationsService {
     invitation: Invitation,
     userId: string,
   ): Promise<void> {
+    // Super admin has global access — bypass membership checks
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (user?.roles?.includes(UserRole.SUPER_ADMIN)) return;
+
     // Verificar permisos en la organización
     if (invitation.organizationId) {
       const memberRole = await this.organizationsService.getMemberRole(

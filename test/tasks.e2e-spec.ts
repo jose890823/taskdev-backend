@@ -13,13 +13,11 @@ import {
   loginAsSuperAdmin,
   createTestUser,
   cleanupTestData,
-  getDataSource,
   authGet,
   authPost,
   authPatch,
   authDelete,
   AuthenticatedUser,
-  clearSecurityRecords,
 } from './helpers/e2e-setup';
 
 describe('Tasks (e2e)', () => {
@@ -276,12 +274,10 @@ describe('Tasks (e2e)', () => {
   // ─── Task Filtering ─────────────────────────────────────────────
 
   describe('Task Filtering', () => {
-    let filteredTaskId: string;
-
     beforeAll(async () => {
       // Create a task assigned to user2 with a specific status for filtering
       const inProgress = getStatus('En progreso');
-      const res = await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
+      await authPost(app, '/api/tasks', userAuth.tokens.accessToken)
         .send({
           title: 'Filterable Task',
           projectId,
@@ -289,7 +285,6 @@ describe('Tasks (e2e)', () => {
           assignedToIds: [user2Auth.user.id],
         })
         .expect(201);
-      filteredTaskId = res.body.data.id;
     });
 
     it('13. Should filter tasks by projectId', async () => {

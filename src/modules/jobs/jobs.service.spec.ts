@@ -22,7 +22,7 @@ describe('JobsService', () => {
   const mockExecution: JobExecution = {
     id: mockExecutionId,
     jobName: 'test-job',
-    queueName: 'michambita-jobs',
+    queueName: 'taskhub-jobs',
     status: JobExecutionStatus.PENDING,
     input: null,
     result: null,
@@ -57,7 +57,7 @@ describe('JobsService', () => {
           useValue: mockJobExecutionRepository,
         },
         {
-          provide: getQueueToken('michambita-jobs'),
+          provide: getQueueToken('taskhub-jobs'),
           useValue: mockQueue,
         },
       ],
@@ -134,7 +134,7 @@ describe('JobsService', () => {
 
       expect(jobExecutionRepository.create).toHaveBeenCalledWith({
         jobName: 'test-job',
-        queueName: 'michambita-jobs',
+        queueName: 'taskhub-jobs',
         status: JobExecutionStatus.PENDING,
         input: null,
         triggeredBy: mockUserId,
@@ -241,9 +241,7 @@ describe('JobsService', () => {
     it('debe retornar ejecuciones con paginacion por defecto', async () => {
       const filters: JobFilterDto = {};
       const mockQb = createMockQueryBuilder([mockExecution], 1);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.getExecutions(filters);
 
@@ -265,9 +263,7 @@ describe('JobsService', () => {
     it('debe aplicar paginacion personalizada', async () => {
       const filters: JobFilterDto = { page: 3, limit: 10 };
       const mockQb = createMockQueryBuilder([], 25);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.getExecutions(filters);
 
@@ -286,9 +282,7 @@ describe('JobsService', () => {
         jobName: 'test-job' as unknown as JobName,
       };
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       await service.getExecutions(filters);
 
@@ -301,9 +295,7 @@ describe('JobsService', () => {
     it('debe filtrar por status', async () => {
       const filters: JobFilterDto = { status: JobExecutionStatus.COMPLETED };
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       await service.getExecutions(filters);
 
@@ -314,17 +306,15 @@ describe('JobsService', () => {
     });
 
     it('debe filtrar por queueName', async () => {
-      const filters: JobFilterDto = { queueName: 'michambita-jobs' };
+      const filters: JobFilterDto = { queueName: 'taskhub-jobs' };
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       await service.getExecutions(filters);
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'execution.queueName = :queueName',
-        { queueName: 'michambita-jobs' },
+        { queueName: 'taskhub-jobs' },
       );
     });
 
@@ -334,9 +324,7 @@ describe('JobsService', () => {
         toDate: '2026-12-31',
       };
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       await service.getExecutions(filters);
 
@@ -353,23 +341,18 @@ describe('JobsService', () => {
     it('debe aplicar ordenamiento personalizado', async () => {
       const filters: JobFilterDto = { sortBy: 'jobName', sortOrder: 'ASC' };
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       await service.getExecutions(filters);
 
-      expect(mockQb.orderBy).toHaveBeenCalledWith(
-        'execution.jobName',
-        'ASC',
-      );
+      expect(mockQb.orderBy).toHaveBeenCalledWith('execution.jobName', 'ASC');
     });
 
     it('debe combinar multiples filtros simultaneamente', async () => {
       const filters: JobFilterDto = {
         jobName: 'test-job' as unknown as JobName,
         status: JobExecutionStatus.FAILED,
-        queueName: 'michambita-jobs',
+        queueName: 'taskhub-jobs',
         fromDate: '2026-01-01',
         toDate: '2026-06-30',
         page: 2,
@@ -378,9 +361,7 @@ describe('JobsService', () => {
         sortOrder: 'ASC',
       };
       const mockQb = createMockQueryBuilder([], 12);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.getExecutions(filters);
 
@@ -397,9 +378,7 @@ describe('JobsService', () => {
     it('debe retornar lista vacia cuando no hay resultados', async () => {
       const filters: JobFilterDto = {};
       const mockQb = createMockQueryBuilder([], 0);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.getExecutions(filters);
 
@@ -411,9 +390,7 @@ describe('JobsService', () => {
     it('debe calcular totalPages correctamente con resultados no exactos', async () => {
       const filters: JobFilterDto = { limit: 10 };
       const mockQb = createMockQueryBuilder([], 23);
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.getExecutions(filters);
 
@@ -480,12 +457,10 @@ describe('JobsService', () => {
     it('debe lanzar NotFoundException cuando la ejecucion no existe', async () => {
       jobExecutionRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.getExecution('non-existent-id'),
-      ).rejects.toThrow(NotFoundException);
-      await expect(
-        service.getExecution('non-existent-id'),
-      ).rejects.toThrow(
+      await expect(service.getExecution('non-existent-id')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.getExecution('non-existent-id')).rejects.toThrow(
         'Ejecucion de job con ID non-existent-id no encontrada',
       );
     });
@@ -503,9 +478,7 @@ describe('JobsService', () => {
         where: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 15 }),
       };
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.cleanOldExecutions();
 
@@ -525,9 +498,7 @@ describe('JobsService', () => {
         where: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
       };
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.cleanOldExecutions();
 
@@ -541,9 +512,7 @@ describe('JobsService', () => {
         where: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ affected: null }),
       };
-      jobExecutionRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      jobExecutionRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
       const result = await service.cleanOldExecutions();
 

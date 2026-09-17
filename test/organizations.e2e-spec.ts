@@ -7,7 +7,6 @@ import {
   loginAsSuperAdmin,
   createTestUser,
   cleanupTestData,
-  getDataSource,
   authGet,
   authPost,
   authPatch,
@@ -114,11 +113,7 @@ describe('Organizations (e2e)', () => {
 
     it('should reject create with duplicate slug name (409)', async () => {
       // First create
-      await authPost(
-        app,
-        '/api/organizations',
-        userAuth.tokens.accessToken,
-      )
+      await authPost(app, '/api/organizations', userAuth.tokens.accessToken)
         .send({ name: 'Unique Slug Org' })
         .expect(201);
 
@@ -136,13 +131,9 @@ describe('Organizations (e2e)', () => {
   });
 
   describe('GET /api/organizations', () => {
-    it('3. should list user\'s organizations', async () => {
+    it("3. should list user's organizations", async () => {
       // Create an org first
-      await authPost(
-        app,
-        '/api/organizations',
-        userAuth.tokens.accessToken,
-      )
+      await authPost(app, '/api/organizations', userAuth.tokens.accessToken)
         .send({ name: 'List Test Org' })
         .expect(201);
 
@@ -161,7 +152,7 @@ describe('Organizations (e2e)', () => {
       expect(orgNames).toContain('List Test Org');
     });
 
-    it('25. regular user should NOT see other user\'s orgs', async () => {
+    it("25. regular user should NOT see other user's orgs", async () => {
       // secondUser creates an org
       await authPost(
         app,
@@ -493,7 +484,6 @@ describe('Organizations (e2e)', () => {
   describe('Invitations', () => {
     let orgId: string;
     let invitationToken: string;
-    let invitationId: string;
 
     beforeAll(async () => {
       const res = await authPost(
@@ -514,8 +504,7 @@ describe('Organizations (e2e)', () => {
           app,
           `/api/organizations/${orgId}/invitations`,
           userAuth.tokens.accessToken,
-        )
-          .send({ email: inviteeEmail, role: 'member' });
+        ).send({ email: inviteeEmail, role: 'member' });
 
         expect(res.status).toBe(201);
 
@@ -527,7 +516,6 @@ describe('Organizations (e2e)', () => {
         expect(res.body.data.status).toBe('pending');
 
         invitationToken = res.body.data.token;
-        invitationId = res.body.data.id;
       });
 
       it('21. should reject duplicate invitation to same email', async () => {
@@ -672,9 +660,7 @@ describe('Organizations (e2e)', () => {
           userAuth.tokens.accessToken,
         ).expect(200);
 
-        const memberUserIds = membersRes.body.data.map(
-          (m: any) => m.userId,
-        );
+        const memberUserIds = membersRes.body.data.map((m: any) => m.userId);
         expect(memberUserIds).toContain(inviteeAuth.user.id);
       });
 
@@ -786,16 +772,12 @@ describe('Organizations (e2e)', () => {
       await unauthDelete(app, `/api/organizations/${fakeUuid}`).expect(401);
 
       // GET members
-      await unauthGet(
-        app,
-        `/api/organizations/${fakeUuid}/members`,
-      ).expect(401);
+      await unauthGet(app, `/api/organizations/${fakeUuid}/members`).expect(
+        401,
+      );
 
       // POST add member
-      await unauthPost(
-        app,
-        `/api/organizations/${fakeUuid}/members`,
-      )
+      await unauthPost(app, `/api/organizations/${fakeUuid}/members`)
         .send({ userId: 'some-id', role: 'member' })
         .expect(401);
 
@@ -806,27 +788,20 @@ describe('Organizations (e2e)', () => {
       ).expect(401);
 
       // POST create invitation
-      await unauthPost(
-        app,
-        `/api/organizations/${fakeUuid}/invitations`,
-      )
+      await unauthPost(app, `/api/organizations/${fakeUuid}/invitations`)
         .send({ email: 'test@test.com' })
         .expect(401);
 
       // GET list invitations
-      await unauthGet(
-        app,
-        `/api/organizations/${fakeUuid}/invitations`,
-      ).expect(401);
+      await unauthGet(app, `/api/organizations/${fakeUuid}/invitations`).expect(
+        401,
+      );
 
       // POST accept invitation (requires auth)
       await unauthPost(app, '/api/invitations/accept/some-token').expect(401);
 
       // DELETE cancel invitation
-      await unauthDelete(
-        app,
-        `/api/invitations/${fakeUuid}`,
-      ).expect(401);
+      await unauthDelete(app, `/api/invitations/${fakeUuid}`).expect(401);
     });
 
     it('should allow super admin to access any organization', async () => {

@@ -219,13 +219,17 @@ export class ProjectsService {
     return this.projectRepository.save(project);
   }
 
-  async remove(identifier: string, userId: string): Promise<void> {
+  async remove(
+    identifier: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
     const where = isUuid(identifier)
       ? { id: identifier }
       : { systemCode: identifier };
     const project = await this.projectRepository.findOne({ where });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
-    if (project.ownerId !== userId) {
+    if (!isSuperAdmin && project.ownerId !== userId) {
       throw new ForbiddenException('Solo el dueno puede eliminar el proyecto');
     }
     // Orphan children and soft-delete in a single atomic transaction to avoid
@@ -256,6 +260,21 @@ export class ProjectsService {
   ): Promise<ProjectMember> {
     const project = await this.findById(identifier);
     await this.verifyAdminAccess(project.id, requestUserId);
+
+    // CW-11: Prevent assigning OWNER role via addMember
+    if (dto.role === ProjectRole.OWNER) {
+      throw new BadRequestException(
+        'No se puede asignar el rol de propietario. Use la transferencia de propiedad.',
+      );
+    }
+
+    // CW-10: Validate userId exists before creating member
+    const userExists = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: dto.userId }, select: ['id'] });
+    if (!userExists) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
 
     const existing = await this.memberRepository.findOne({
       where: { projectId: project.id, userId: dto.userId },

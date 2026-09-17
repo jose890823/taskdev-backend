@@ -48,6 +48,7 @@ export class NotificationEventsService {
     referenceId?: string;
     referenceType?: string;
     priority?: NotificationPriority;
+    projectId?: string;
   }): Promise<void> {
     // Verificar si el evento esta habilitado por admin
     if (!this.configService.isEventEnabled(params.eventType)) {
@@ -57,6 +58,7 @@ export class NotificationEventsService {
 
     const notification = await this.notificationsService.create({
       userId: params.userId,
+      projectId: params.projectId,
       type: params.type,
       title: params.title,
       message: params.message,
@@ -87,6 +89,7 @@ export class NotificationEventsService {
     taskId: string;
     taskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     assignedToId: string;
     assignedByName: string;
   }): Promise<void> {
@@ -106,6 +109,7 @@ export class NotificationEventsService {
       actionUrl: `/tasks/${payload.taskId}`,
       referenceId: payload.taskId,
       referenceType: 'task',
+      projectId: payload.projectId,
     });
   }
 
@@ -114,6 +118,7 @@ export class NotificationEventsService {
     taskId: string;
     taskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     unassignedUserId: string;
     unassignedByName: string;
   }): Promise<void> {
@@ -133,6 +138,7 @@ export class NotificationEventsService {
       actionUrl: `/tasks/${payload.taskId}`,
       referenceId: payload.taskId,
       referenceType: 'task',
+      projectId: payload.projectId,
     });
   }
 
@@ -141,6 +147,7 @@ export class NotificationEventsService {
     taskId: string;
     taskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     oldStatusName: string;
     newStatusName: string;
     changedByName: string;
@@ -166,6 +173,7 @@ export class NotificationEventsService {
           actionUrl: `/tasks/${payload.taskId}`,
           referenceId: payload.taskId,
           referenceType: 'task',
+          projectId: payload.projectId,
         }),
       ),
     );
@@ -176,6 +184,7 @@ export class NotificationEventsService {
     taskId: string;
     taskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     completedByName: string;
     assigneeIds: string[];
     completedById: string;
@@ -199,6 +208,7 @@ export class NotificationEventsService {
           actionUrl: `/tasks/${payload.taskId}`,
           referenceId: payload.taskId,
           referenceType: 'task',
+          projectId: payload.projectId,
         }),
       ),
     );
@@ -209,6 +219,7 @@ export class NotificationEventsService {
     taskId: string;
     taskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     commentByName: string;
     commentById: string;
     assigneeIds: string[];
@@ -232,6 +243,7 @@ export class NotificationEventsService {
           actionUrl: `/tasks/${payload.taskId}`,
           referenceId: payload.taskId,
           referenceType: 'task',
+          projectId: payload.projectId,
         }),
       ),
     );
@@ -243,6 +255,7 @@ export class NotificationEventsService {
     parentTaskTitle: string;
     subtaskTitle: string;
     taskPriority?: string;
+    projectId?: string;
     createdByName: string;
     createdById: string;
     assigneeIds: string[];
@@ -266,6 +279,7 @@ export class NotificationEventsService {
           actionUrl: `/tasks/${payload.parentTaskId}`,
           referenceId: payload.parentTaskId,
           referenceType: 'task',
+          projectId: payload.projectId,
         }),
       ),
     );
@@ -294,6 +308,7 @@ export class NotificationEventsService {
       actionUrl: `/projects/${payload.projectSlug || payload.projectId}`,
       referenceId: payload.projectId,
       referenceType: 'project',
+      projectId: payload.projectId,
     });
   }
 
@@ -315,6 +330,7 @@ export class NotificationEventsService {
       actionUrl: `/projects`,
       referenceId: payload.projectId,
       referenceType: 'project',
+      projectId: payload.projectId,
     });
   }
 

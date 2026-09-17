@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { WebhooksService } from './webhooks.service';
 import {
@@ -19,8 +16,6 @@ describe('WebhooksService', () => {
   // ── Mock data ──────────────────────────────────────────────
 
   const mockEventId = '123e4567-e89b-12d3-a456-426614174000';
-  const mockEventId2 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-
   const createMockWebhookEvent = (
     overrides: Partial<WebhookEvent> = {},
   ): WebhookEvent => {
@@ -355,46 +350,52 @@ describe('WebhooksService', () => {
   // ================================================================
 
   describe('markProcessing', () => {
-    it('should mark event as processing and increment attempts', async () => {
+    it('should mark event as processing via atomic UPDATE', async () => {
       const event = createMockWebhookEvent({
-        status: WebhookEventStatus.RECEIVED,
-        attempts: 0,
+        status: WebhookEventStatus.PROCESSING,
+        attempts: 1,
       });
+      const mockQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      // Add update and set methods for the atomic UPDATE chain
+      mockQb.update = jest.fn().mockReturnValue(mockQb);
+      mockQb.set = jest.fn().mockReturnValue(mockQb);
+
+      webhookEventRepository.createQueryBuilder.mockReturnValue(mockQb as any);
       webhookEventRepository.findOne.mockResolvedValue(event);
-      webhookEventRepository.save.mockImplementation(
-        async (entity) => entity as WebhookEvent,
+
+      const result = await service.markProcessing(mockEventId);
+
+      expect(webhookEventRepository.createQueryBuilder).toHaveBeenCalled();
+      expect(mockQb.update).toHaveBeenCalledWith(WebhookEvent);
+      expect(mockQb.set).toHaveBeenCalledWith({
+        status: WebhookEventStatus.PROCESSING,
+        attempts: expect.any(Function),
+      });
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'id = :id AND status = :status',
+        {
+          id: mockEventId,
+          status: WebhookEventStatus.RECEIVED,
+        },
       );
-
-      await service.markProcessing(mockEventId);
-
-      expect(webhookEventRepository.save).toHaveBeenCalled();
-      const saved = (webhookEventRepository.save as jest.Mock).mock.calls[0][0];
-      expect(saved.status).toBe(WebhookEventStatus.PROCESSING);
-      expect(saved.attempts).toBe(1);
+      expect(mockQb.execute).toHaveBeenCalled();
+      expect(result).toEqual(event);
     });
 
-    it('should increment attempts from existing count', async () => {
-      const event = createMockWebhookEvent({
-        status: WebhookEventStatus.FAILED,
-        attempts: 2,
+    it('should return null when event is already claimed or does not exist', async () => {
+      const mockQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
       });
-      webhookEventRepository.findOne.mockResolvedValue(event);
-      webhookEventRepository.save.mockImplementation(
-        async (entity) => entity as WebhookEvent,
-      );
+      mockQb.update = jest.fn().mockReturnValue(mockQb);
+      mockQb.set = jest.fn().mockReturnValue(mockQb);
 
-      await service.markProcessing(mockEventId);
+      webhookEventRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 
-      const saved = (webhookEventRepository.save as jest.Mock).mock.calls[0][0];
-      expect(saved.attempts).toBe(3);
-    });
+      const result = await service.markProcessing('non-existent');
 
-    it('should throw NotFoundException when event does not exist', async () => {
-      webhookEventRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.markProcessing('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      expect(result).toBeNull();
     });
   });
 
@@ -485,8 +486,7 @@ describe('WebhooksService', () => {
       expect(saved.nextRetryAt).toBeInstanceOf(Date);
       // Exponential backoff: 2^1 * 30s = 60s into the future
       const expectedMinDelay = 55 * 1000; // allow some tolerance
-      const actualDelay =
-        saved.nextRetryAt.getTime() - Date.now();
+      const actualDelay = saved.nextRetryAt.getTime() - Date.now();
       expect(actualDelay).toBeGreaterThan(expectedMinDelay);
     });
 
@@ -745,10 +745,7 @@ describe('WebhooksService', () => {
         limit: 20,
         totalPages: 1,
       });
-      expect(mockQb.orderBy).toHaveBeenCalledWith(
-        'webhook.createdAt',
-        'DESC',
-      );
+      expect(mockQb.orderBy).toHaveBeenCalledWith('webhook.createdAt', 'DESC');
       expect(mockQb.skip).toHaveBeenCalledWith(0);
       expect(mockQb.take).toHaveBeenCalledWith(20);
     });
@@ -761,10 +758,9 @@ describe('WebhooksService', () => {
 
       await service.getEvents({ source: WebhookSource.STRIPE });
 
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'webhook.source = :source',
-        { source: WebhookSource.STRIPE },
-      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith('webhook.source = :source', {
+        source: WebhookSource.STRIPE,
+      });
     });
 
     it('should apply status filter', async () => {
@@ -775,10 +771,9 @@ describe('WebhooksService', () => {
 
       await service.getEvents({ status: WebhookEventStatus.FAILED });
 
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'webhook.status = :status',
-        { status: WebhookEventStatus.FAILED },
-      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith('webhook.status = :status', {
+        status: WebhookEventStatus.FAILED,
+      });
     });
 
     it('should apply eventType filter', async () => {
@@ -942,9 +937,7 @@ describe('WebhooksService', () => {
         getRawOne: jest.fn().mockResolvedValue({ avg: '125.50' }),
       });
 
-      webhookEventRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      webhookEventRepository.createQueryBuilder.mockReturnValue(mockQb as any);
       webhookEventRepository.count.mockResolvedValue(3); // pendingRetry
 
       const result = await service.getStats();
@@ -976,9 +969,7 @@ describe('WebhooksService', () => {
         getRawOne: jest.fn().mockResolvedValue(null),
       });
 
-      webhookEventRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      webhookEventRepository.createQueryBuilder.mockReturnValue(mockQb as any);
       webhookEventRepository.count.mockResolvedValue(0);
 
       const result = await service.getStats();
@@ -1004,9 +995,7 @@ describe('WebhooksService', () => {
         getRawOne: jest.fn().mockResolvedValue({ avg: null }),
       });
 
-      webhookEventRepository.createQueryBuilder.mockReturnValue(
-        mockQb as any,
-      );
+      webhookEventRepository.createQueryBuilder.mockReturnValue(mockQb as any);
       webhookEventRepository.count.mockResolvedValue(0);
 
       const result = await service.getStats();
@@ -1035,15 +1024,9 @@ describe('WebhooksService', () => {
         'createdAt < :cutoffDate',
         expect.objectContaining({ cutoffDate: expect.any(Date) }),
       );
-      expect(mockQb.andWhere).toHaveBeenCalledWith(
-        'status IN (:...statuses)',
-        {
-          statuses: [
-            WebhookEventStatus.PROCESSED,
-            WebhookEventStatus.SKIPPED,
-          ],
-        },
-      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith('status IN (:...statuses)', {
+        statuses: [WebhookEventStatus.PROCESSED, WebhookEventStatus.SKIPPED],
+      });
     });
 
     it('should use custom daysToKeep value', async () => {
@@ -1056,7 +1039,7 @@ describe('WebhooksService', () => {
 
       expect(result).toBe(10);
       // Verify cutoff date is approximately 30 days ago
-      const callArgs = (mockQb.where as jest.Mock).mock.calls[0];
+      const callArgs = mockQb.where.mock.calls[0];
       const cutoffDate = callArgs[1].cutoffDate as Date;
       const expectedCutoff = new Date();
       expectedCutoff.setDate(expectedCutoff.getDate() - 30);

@@ -28,7 +28,7 @@ import { ErrorCodes } from '../../../common/dto';
 
 const CACHE_KEY_ACTIVE = 'storage:active';
 const CACHE_KEY_PREFIX = 'storage:config:';
-const CACHE_TTL = 300000; // 5 minutos
+const CACHE_TTL = 300000; // 5 minutes in milliseconds (cache-manager v7 uses ms)
 
 /**
  * Servicio para gestionar la configuración dinámica de proveedores de storage

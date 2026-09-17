@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -65,6 +65,9 @@ export class LocalStorageProvider implements IStorageProvider {
     const relativePath = path.join(options.path, filename);
     const fullPath = path.join(this.basePath, relativePath);
 
+    // Validar que la ruta no escape del basePath
+    this.validatePathTraversal(fullPath);
+
     // Asegurar que el directorio existe
     await this.ensureDirectory(path.dirname(fullPath));
 
@@ -100,6 +103,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, filePath);
+    this.validatePathTraversal(fullPath);
 
     if (!(await this.exists(filePath))) {
       throw new Error(`File not found: ${filePath}`);
@@ -115,6 +119,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, filePath);
+    this.validatePathTraversal(fullPath);
 
     if (!(await this.exists(filePath))) {
       throw new Error(`File not found: ${filePath}`);
@@ -130,6 +135,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, filePath);
+    this.validatePathTraversal(fullPath);
 
     try {
       await fs.promises.unlink(fullPath);
@@ -165,6 +171,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, filePath);
+    this.validatePathTraversal(fullPath);
 
     try {
       await fs.promises.access(fullPath, fs.constants.F_OK);
@@ -208,6 +215,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, filePath);
+    this.validatePathTraversal(fullPath);
 
     if (!(await this.exists(filePath))) {
       throw new Error(`File not found: ${filePath}`);
@@ -236,6 +244,8 @@ export class LocalStorageProvider implements IStorageProvider {
 
     const sourceFullPath = path.join(this.basePath, sourcePath);
     const destFullPath = path.join(this.basePath, destinationPath);
+    this.validatePathTraversal(sourceFullPath);
+    this.validatePathTraversal(destFullPath);
 
     if (!(await this.exists(sourcePath))) {
       throw new Error(`Source file not found: ${sourcePath}`);
@@ -270,6 +280,8 @@ export class LocalStorageProvider implements IStorageProvider {
 
     const sourceFullPath = path.join(this.basePath, sourcePath);
     const destFullPath = path.join(this.basePath, destinationPath);
+    this.validatePathTraversal(sourceFullPath);
+    this.validatePathTraversal(destFullPath);
 
     if (!(await this.exists(sourcePath))) {
       throw new Error(`Source file not found: ${sourcePath}`);
@@ -303,6 +315,7 @@ export class LocalStorageProvider implements IStorageProvider {
     this.ensureInitialized();
 
     const fullPath = path.join(this.basePath, dirPath);
+    this.validatePathTraversal(fullPath);
     const files: FileMetadata[] = [];
 
     try {
@@ -368,6 +381,22 @@ export class LocalStorageProvider implements IStorageProvider {
   }
 
   // ===== Métodos privados =====
+
+  /**
+   * Valida que la ruta resuelta no escape del basePath (previene path traversal)
+   */
+  private validatePathTraversal(fullPath: string): void {
+    const resolvedBase = path.resolve(this.basePath);
+    const resolvedFull = path.resolve(fullPath);
+    if (
+      !resolvedFull.startsWith(resolvedBase + path.sep) &&
+      resolvedFull !== resolvedBase
+    ) {
+      throw new BadRequestException(
+        'Invalid file path: path traversal detected',
+      );
+    }
+  }
 
   private ensureInitialized(): void {
     if (!this.initialized) {

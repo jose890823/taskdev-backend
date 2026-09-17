@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { DataSource, Repository } from 'typeorm';
 import { TaskStatusesService } from './task-statuses.service';
 import { TaskStatus } from './entities/task-status.entity';
 import { CreateTaskStatusDto } from './dto/create-task-status.dto';
@@ -57,6 +57,14 @@ describe('TaskStatusesService', () => {
     } as unknown as TaskStatus,
   ];
 
+  const mockTaskRepository = {
+    count: jest.fn().mockResolvedValue(0),
+  };
+
+  const mockDataSource = {
+    getRepository: jest.fn().mockReturnValue(mockTaskRepository),
+  };
+
   beforeEach(async () => {
     const mockStatusRepository = {
       findOne: jest.fn(),
@@ -65,6 +73,7 @@ describe('TaskStatusesService', () => {
       create: jest.fn(),
       save: jest.fn(),
       delete: jest.fn(),
+      softDelete: jest.fn(),
       createQueryBuilder: jest.fn(),
     };
 
@@ -74,6 +83,10 @@ describe('TaskStatusesService', () => {
         {
           provide: getRepositoryToken(TaskStatus),
           useValue: mockStatusRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -263,13 +276,26 @@ describe('TaskStatusesService', () => {
   });
 
   describe('remove', () => {
-    it('debe eliminar el estado correctamente', async () => {
+    it('debe soft-eliminar el estado correctamente cuando no hay tareas usando el estado', async () => {
       statusRepository.findOne.mockResolvedValue(mockStatus);
-      statusRepository.delete.mockResolvedValue({ affected: 1 } as any);
+      mockTaskRepository.count.mockResolvedValue(0);
+      statusRepository.softDelete.mockResolvedValue({ affected: 1 } as any);
 
       await service.remove(mockStatus.id);
 
-      expect(statusRepository.delete).toHaveBeenCalledWith(mockStatus.id);
+      expect(statusRepository.softDelete).toHaveBeenCalledWith(mockStatus.id);
+    });
+
+    it('debe lanzar BadRequestException si hay tareas usando el estado', async () => {
+      statusRepository.findOne.mockResolvedValue(mockStatus);
+      mockTaskRepository.count.mockResolvedValue(3);
+
+      await expect(service.remove(mockStatus.id)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.remove(mockStatus.id)).rejects.toThrow(
+        'No se puede eliminar: 3 tarea(s) usan este estado',
+      );
     });
 
     it('debe lanzar NotFoundException si el estado no existe', async () => {

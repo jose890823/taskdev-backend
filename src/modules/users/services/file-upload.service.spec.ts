@@ -162,7 +162,6 @@ describe('FileUploadService', () => {
 
     it('should generate a unique filename with userId, timestamp, and random hex', async () => {
       const file = createMockFile();
-      const beforeTs = Date.now();
 
       const result = await service.uploadProfilePhoto(file, USER_ID);
 
@@ -193,13 +192,13 @@ describe('FileUploadService', () => {
         size: 6 * 1024 * 1024, // 6MB
       });
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(/exceeds maximum allowed size/);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        /exceeds maximum allowed size/,
+      );
     });
 
     it('should allow files exactly at 5MB limit', async () => {
@@ -218,13 +217,13 @@ describe('FileUploadService', () => {
         originalname: 'document.pdf',
       });
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(/Invalid file type/);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        /Invalid file type/,
+      );
     });
 
     it('should throw BadRequestException for invalid mime type (image/gif)', async () => {
@@ -233,9 +232,9 @@ describe('FileUploadService', () => {
         originalname: 'animation.gif',
       });
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException for invalid mime type (image/svg+xml)', async () => {
@@ -244,9 +243,9 @@ describe('FileUploadService', () => {
         originalname: 'icon.svg',
       });
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException when writeFileSync fails', async () => {
@@ -255,13 +254,13 @@ describe('FileUploadService', () => {
         throw new Error('ENOSPC: no space left on device');
       });
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      await expect(
-        service.uploadProfilePhoto(file, USER_ID),
-      ).rejects.toThrow('Failed to upload file');
+      await expect(service.uploadProfilePhoto(file, USER_ID)).rejects.toThrow(
+        'Failed to upload file',
+      );
     });
 
     it('should handle file with no extension', async () => {
@@ -297,7 +296,9 @@ describe('FileUploadService', () => {
       const file = createMockFile();
       const result = await service.uploadProfilePhoto(file, USER_ID);
 
-      expect(result).toContain('https://api.taskhub.com/uploads/profile-photos/');
+      expect(result).toContain(
+        'https://api.taskhub.com/uploads/profile-photos/',
+      );
     });
   });
 

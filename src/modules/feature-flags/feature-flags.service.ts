@@ -93,7 +93,11 @@ export class FeatureFlagsService {
       }
     }
 
-    Object.assign(flag, dto);
+    // CW-36: Filter out undefined values to avoid overwriting existing fields
+    const definedFields = Object.fromEntries(
+      Object.entries(dto).filter(([_, v]) => v !== undefined),
+    );
+    Object.assign(flag, definedFields);
     const updated = await this.featureFlagRepository.save(flag);
 
     this.logger.log(`Feature flag actualizado: ${updated.key} (${updated.id})`);
@@ -125,12 +129,34 @@ export class FeatureFlagsService {
    *
    * @param key - Clave del feature flag
    * @param context - Contexto opcional con roles y storeId del usuario
+   * @param visited - Set interno para detectar dependencias circulares (no usar externamente)
    * @returns true si el feature flag está habilitado para el contexto dado
    */
   async isEnabled(
     key: string,
     context?: { roles?: string[]; storeId?: string },
+    visited?: Set<string>,
   ): Promise<boolean> {
+    const visitedKeys = visited || new Set<string>();
+
+    // Detectar dependencias circulares
+    if (visitedKeys.has(key)) {
+      this.logger.warn(
+        `Dependencia circular detectada para feature flag: ${key}`,
+      );
+      return false;
+    }
+
+    // Limitar profundidad de dependencias
+    if (visitedKeys.size > 10) {
+      this.logger.warn(
+        `Profundidad maxima de dependencias excedida para feature flag: ${key}`,
+      );
+      return false;
+    }
+
+    visitedKeys.add(key);
+
     const flag = await this.featureFlagRepository.findOne({ where: { key } });
 
     // Si no existe el flag, retornar false
@@ -144,11 +170,10 @@ export class FeatureFlagsService {
     }
 
     // Verificar restricción por roles
-    if (
-      flag.enabledForRoles &&
-      flag.enabledForRoles.length > 0 &&
-      context?.roles
-    ) {
+    if (flag.enabledForRoles && flag.enabledForRoles.length > 0) {
+      if (!context?.roles || context.roles.length === 0) {
+        return false;
+      }
       const hasMatchingRole = flag.enabledForRoles.some((role) =>
         context.roles!.includes(role),
       );
@@ -168,9 +193,13 @@ export class FeatureFlagsService {
       }
     }
 
-    // Verificar dependencia
+    // Verificar dependencia (con deteccion de ciclos)
     if (flag.dependsOn) {
-      const dependencyEnabled = await this.isEnabled(flag.dependsOn, context);
+      const dependencyEnabled = await this.isEnabled(
+        flag.dependsOn,
+        context,
+        visitedKeys,
+      );
       if (!dependencyEnabled) {
         return false;
       }

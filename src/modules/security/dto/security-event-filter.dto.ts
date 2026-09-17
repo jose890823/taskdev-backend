@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsEnum,
   IsInt,
+  IsIn,
   Min,
   Max,
   IsString,
@@ -103,8 +104,13 @@ export class SecurityEventFilterDto {
     description: 'Campo de ordenamiento',
     required: false,
     default: 'createdAt',
+    enum: ['createdAt', 'eventType', 'severity', 'ipAddress', 'userId'],
   })
   @IsOptional()
+  @IsIn(['createdAt', 'eventType', 'severity', 'ipAddress', 'userId'], {
+    message:
+      'sortBy debe ser uno de: createdAt, eventType, severity, ipAddress, userId',
+  })
   sortBy?: string = 'createdAt';
 
   @ApiProperty({

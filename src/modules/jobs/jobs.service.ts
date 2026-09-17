@@ -15,6 +15,17 @@ import {
 } from './entities/job-execution.entity';
 import { JobFilterDto } from './dto/job-filter.dto';
 
+/** Campos permitidos para ordenamiento en consultas de ejecuciones */
+const ALLOWED_SORT_FIELDS = [
+  'startedAt',
+  'completedAt',
+  'jobName',
+  'status',
+  'createdAt',
+  'durationMs',
+  'queueName',
+];
+
 /**
  * Servicio central para gestion de jobs en background
  * Registra jobs programados, permite disparos manuales
@@ -25,7 +36,7 @@ export class JobsService implements OnModuleInit {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
-    @InjectQueue('michambita-jobs')
+    @InjectQueue('taskhub-jobs')
     private readonly queue: Queue,
     @InjectRepository(JobExecution)
     private readonly jobExecutionRepository: Repository<JobExecution>,
@@ -65,7 +76,7 @@ export class JobsService implements OnModuleInit {
     // Crear registro de ejecucion
     const execution = this.jobExecutionRepository.create({
       jobName: jobName as unknown as string,
-      queueName: 'michambita-jobs',
+      queueName: 'taskhub-jobs',
       status: JobExecutionStatus.PENDING,
       input: input ?? null,
       triggeredBy: triggeredBy ?? null,
@@ -111,9 +122,14 @@ export class JobsService implements OnModuleInit {
       sortOrder = 'DESC',
     } = filters;
 
+    // Whitelist sortBy para prevenir SQL injection
+    const safeSortBy = ALLOWED_SORT_FIELDS.includes(sortBy)
+      ? sortBy
+      : 'startedAt';
+
     const queryBuilder = this.jobExecutionRepository
       .createQueryBuilder('execution')
-      .orderBy(`execution.${sortBy}`, sortOrder)
+      .orderBy(`execution.${safeSortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);
 

@@ -85,7 +85,7 @@ describe('ProjectsService', () => {
     const mockDataSource = {
       transaction: jest.fn(),
       getRepository: jest.fn().mockReturnValue({
-        findOne: jest.fn(),
+        findOne: jest.fn().mockResolvedValue({ id: mockMemberUserId }),
       }),
     };
 

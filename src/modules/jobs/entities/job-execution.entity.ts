@@ -17,7 +17,7 @@ export enum JobExecutionStatus {
 }
 
 /**
- * Nombres de jobs disponibles en MiChambita
+ * Nombres de jobs disponibles en TaskHub
  */
 export enum JobName {
   // Los jobs especificos se agregaran segun las necesidades del proyecto

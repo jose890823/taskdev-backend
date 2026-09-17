@@ -1,3 +1,5 @@
+import * as crypto from 'crypto';
+
 /**
  * Generador de codigos del sistema para entidades
  *
@@ -37,15 +39,13 @@ const ALPHANUMERIC_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 /**
  * Genera 'length' caracteres alfanumericos aleatorios (A-Z, 0-9)
+ * Uses crypto.randomBytes for cryptographically secure randomness.
  */
 function generateRandomChars(length: number): string {
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += ALPHANUMERIC_CHARS.charAt(
-      Math.floor(Math.random() * ALPHANUMERIC_CHARS.length),
-    );
-  }
-  return result;
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes)
+    .map((b) => ALPHANUMERIC_CHARS[b % ALPHANUMERIC_CHARS.length])
+    .join('');
 }
 
 /**

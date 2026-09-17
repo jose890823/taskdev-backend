@@ -111,6 +111,14 @@ export class SecurityAdminController {
     return this.securityEventService.findAll(filter);
   }
 
+  @Get('events/stats')
+  @ApiOperation({ summary: 'Estadisticas de eventos' })
+  @ApiQuery({ name: 'days', required: false, description: 'Dias a analizar' })
+  @ApiResponse({ status: 200, description: 'Estadisticas' })
+  async getEventStats(@Query('days') days?: number) {
+    return this.securityEventService.getStats(days || 7);
+  }
+
   @Get('events/:id')
   @ApiOperation({ summary: 'Obtener evento por ID' })
   @ApiParam({ name: 'id', description: 'ID del evento' })
@@ -132,14 +140,6 @@ export class SecurityAdminController {
     @CurrentUser() user: User,
   ) {
     return this.securityEventService.markAsReviewed(id, user.id, dto.notes);
-  }
-
-  @Get('events/stats')
-  @ApiOperation({ summary: 'Estadisticas de eventos' })
-  @ApiQuery({ name: 'days', required: false, description: 'Dias a analizar' })
-  @ApiResponse({ status: 200, description: 'Estadisticas' })
-  async getEventStats(@Query('days') days?: number) {
-    return this.securityEventService.getStats(days || 7);
   }
 
   // ============================================
@@ -357,6 +357,14 @@ export class SecurityAdminController {
     return this.securityAlertService.findActive();
   }
 
+  @Get('alerts/stats')
+  @ApiOperation({ summary: 'Estadisticas de alertas' })
+  @ApiQuery({ name: 'days', required: false, description: 'Dias a analizar' })
+  @ApiResponse({ status: 200, description: 'Estadisticas' })
+  async getAlertStats(@Query('days') days?: number) {
+    return this.securityAlertService.getStats(days || 30);
+  }
+
   @Get('alerts/:id')
   @ApiOperation({ summary: 'Obtener alerta por ID' })
   @ApiParam({ name: 'id', description: 'ID de la alerta' })
@@ -395,14 +403,6 @@ export class SecurityAdminController {
   @ApiResponse({ status: 200, description: 'Alerta asignada' })
   async assignAlert(@Param('id') id: string, @Body() dto: AssignAlertDto) {
     return this.securityAlertService.assign(id, dto.assignedToId);
-  }
-
-  @Get('alerts/stats')
-  @ApiOperation({ summary: 'Estadisticas de alertas' })
-  @ApiQuery({ name: 'days', required: false, description: 'Dias a analizar' })
-  @ApiResponse({ status: 200, description: 'Estadisticas' })
-  async getAlertStats(@Query('days') days?: number) {
-    return this.securityAlertService.getStats(days || 30);
   }
 
   // ============================================

@@ -33,8 +33,16 @@ export class CommentsService {
     taskId: string,
     userId: string,
     isSuperAdmin = false,
-  ): Promise<void> {
-    await this.tasksService.verifyTaskAccess(taskId, userId, isSuperAdmin);
+    boundProjectId?: string,
+  ): Promise<Task> {
+    return boundProjectId === undefined
+      ? this.tasksService.verifyTaskAccess(taskId, userId, isSuperAdmin)
+      : this.tasksService.verifyTaskAccess(
+          taskId,
+          userId,
+          isSuperAdmin,
+          boundProjectId,
+        );
   }
 
   async create(dto: CreateCommentDto, user: User): Promise<any> {
@@ -87,6 +95,7 @@ export class CommentsService {
     if (assigneeIds.length > 0) {
       this.eventEmitter.emit('task.commented', {
         taskId,
+        projectId: task.projectId || undefined,
         taskTitle: task.title,
         taskPriority: task.priority,
         commentByName: `${user.firstName} ${user.lastName}`,
@@ -139,8 +148,10 @@ export class CommentsService {
     id: string,
     dto: UpdateCommentDto,
     userId: string,
+    isSuperAdmin = false,
   ): Promise<Comment> {
     const comment = await this.findById(id);
+    await this.verifyTaskAccess(comment.taskId, userId, isSuperAdmin);
     if (comment.userId !== userId) {
       throw new ForbiddenException('Solo el autor puede editar el comentario');
     }
@@ -148,8 +159,13 @@ export class CommentsService {
     return this.commentRepository.save(comment);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
+  async remove(
+    id: string,
+    userId: string,
+    isSuperAdmin = false,
+  ): Promise<void> {
     const comment = await this.findById(id);
+    await this.verifyTaskAccess(comment.taskId, userId, isSuperAdmin);
     if (comment.userId !== userId) {
       throw new ForbiddenException(
         'Solo el autor puede eliminar el comentario',

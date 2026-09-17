@@ -39,8 +39,9 @@ jest.mock('resend', () => {
     Resend: jest.fn().mockImplementation(() => ({
       emails: {
         get send() {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          return require('./email.service.spec')._mocks?.resendSend ?? jest.fn();
+          return (
+            require('./email.service.spec')._mocks?.resendSend ?? jest.fn()
+          );
         },
       },
     })),
@@ -51,11 +52,9 @@ jest.mock('resend', () => {
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn().mockImplementation(() => ({
     get sendMail() {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       return require('./email.service.spec')._mocks?.sendMail ?? jest.fn();
     },
     get verify() {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       return require('./email.service.spec')._mocks?.verify ?? jest.fn();
     },
   })),
@@ -66,8 +65,9 @@ jest.mock('googleapis', () => {
   const OAuth2 = jest.fn().mockImplementation(() => ({
     setCredentials: jest.fn(),
     get getAccessToken() {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      return require('./email.service.spec')._mocks?.getAccessToken ?? jest.fn();
+      return (
+        require('./email.service.spec')._mocks?.getAccessToken ?? jest.fn()
+      );
     },
   }));
   return {
@@ -77,8 +77,10 @@ jest.mock('googleapis', () => {
         users: {
           messages: {
             get send() {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              return require('./email.service.spec')._mocks?.messagesSend ?? jest.fn();
+              return (
+                require('./email.service.spec')._mocks?.messagesSend ??
+                jest.fn()
+              );
             },
           },
         },
@@ -521,7 +523,10 @@ describe('EmailService', () => {
     });
 
     it('should generate OTP template and send email', async () => {
-      _mocks.resendSend.mockResolvedValue({ data: { id: 'otp-1' }, error: null });
+      _mocks.resendSend.mockResolvedValue({
+        data: { id: 'otp-1' },
+        error: null,
+      });
 
       const service = await buildService({
         RESEND_API_KEY: 're_test_key',
@@ -551,7 +556,10 @@ describe('EmailService', () => {
     });
 
     it('should use default expiration of 10 minutes when not provided', async () => {
-      _mocks.resendSend.mockResolvedValue({ data: { id: 'otp-2' }, error: null });
+      _mocks.resendSend.mockResolvedValue({
+        data: { id: 'otp-2' },
+        error: null,
+      });
 
       const service = await buildService({
         RESEND_API_KEY: 're_test_key',

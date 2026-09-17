@@ -183,7 +183,16 @@ export class EncryptionService {
     }
 
     const textHash = this.hash(text);
-    return textHash === hash;
+    const textHashBuf = Buffer.from(textHash);
+    const hashBuf = Buffer.from(hash);
+
+    // Different lengths means they can't match; return early to avoid
+    // timingSafeEqual throwing on mismatched buffer sizes.
+    if (textHashBuf.length !== hashBuf.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(textHashBuf, hashBuf);
   }
 
   /**

@@ -17,6 +17,16 @@ import {
  * DTO para crear una notificación
  */
 export class CreateNotificationDto {
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description:
+      'ID del proyecto de origen; omitir para notificaciones de sistema u organización',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'El ID del proyecto debe ser un UUID válido' })
+  projectId?: string;
+
   @ApiProperty({
     example: '550e8400-e29b-41d4-a716-446655440000',
     description: 'ID del usuario destinatario',

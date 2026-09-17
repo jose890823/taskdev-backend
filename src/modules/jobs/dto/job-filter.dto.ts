@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsEnum,
   IsInt,
+  IsIn,
   Min,
   Max,
   IsDateString,
@@ -36,7 +37,7 @@ export class JobFilterDto {
   status?: JobExecutionStatus;
 
   @ApiProperty({
-    example: 'michambita-jobs',
+    example: 'taskhub-jobs',
     description: 'Filtrar por nombre de la cola',
     required: false,
   })
@@ -98,9 +99,29 @@ export class JobFilterDto {
     description: 'Campo de ordenamiento',
     required: false,
     default: 'startedAt',
+    enum: [
+      'startedAt',
+      'completedAt',
+      'jobName',
+      'status',
+      'createdAt',
+      'durationMs',
+      'queueName',
+    ],
   })
   @IsOptional()
-  @IsString()
+  @IsIn(
+    [
+      'startedAt',
+      'completedAt',
+      'jobName',
+      'status',
+      'createdAt',
+      'durationMs',
+      'queueName',
+    ],
+    { message: 'El campo de ordenamiento no es valido' },
+  )
   sortBy?: string = 'startedAt';
 
   @ApiProperty({

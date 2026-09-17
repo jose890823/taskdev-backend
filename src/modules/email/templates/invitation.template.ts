@@ -7,12 +7,22 @@ interface InvitationTemplateData {
   projectName?: string;
 }
 
+/** Escape user-controlled strings to prevent HTML injection in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function getInvitationEmailTemplate(
   data: InvitationTemplateData,
 ): string {
   const brandName = data.brandName || 'TaskHub';
   const invitedBy = data.invitedByName
-    ? ` por <strong style="color: #e2e8f0;">${data.invitedByName}</strong>`
+    ? ` por <strong style="color: #e2e8f0;">${escapeHtml(data.invitedByName)}</strong>`
     : '';
 
   const roleLabels: Record<string, string> = {
@@ -21,11 +31,16 @@ export function getInvitationEmailTemplate(
     member: 'Miembro',
     viewer: 'Observador',
   };
-  const roleLabel = roleLabels[data.role] || data.role;
+  const roleLabel = roleLabels[data.role] || escapeHtml(data.role);
 
-  const inviteTarget = data.projectName
-    ? `al proyecto <strong style="color: #e2e8f0;">${data.projectName}</strong> en <strong style="color: #e2e8f0;">${data.organizationName}</strong>`
-    : `a la organizacion <strong style="color: #e2e8f0;">${data.organizationName}</strong>`;
+  const safeOrgName = escapeHtml(data.organizationName);
+  const safeProjectName = data.projectName
+    ? escapeHtml(data.projectName)
+    : undefined;
+
+  const inviteTarget = safeProjectName
+    ? `al proyecto <strong style="color: #e2e8f0;">${safeProjectName}</strong> en <strong style="color: #e2e8f0;">${safeOrgName}</strong>`
+    : `a la organizacion <strong style="color: #e2e8f0;">${safeOrgName}</strong>`;
 
   return `
 <!DOCTYPE html>

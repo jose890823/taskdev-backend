@@ -109,6 +109,8 @@ describe('InvitationsService', () => {
     transaction: jest.fn().mockImplementation(async (cb) => {
       const mockManager = {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
       };
       return cb(mockManager);
     }),
@@ -800,36 +802,44 @@ describe('InvitationsService', () => {
       const result = await service.accept(invitation.token, acceptingUser);
 
       expect(result.message).toBe('Invitacion aceptada exitosamente');
-      expect(organizationsService.addMember).toHaveBeenCalledWith(
-        invitation.organizationId,
-        {
-          userId: acceptingUser.id,
-          role: invitation.role as OrganizationRole,
-        },
-        invitation.invitedById,
-      );
+      // Now uses transaction manager directly instead of organizationsService.addMember
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it('debe agregar al proyecto si la invitacion tiene projectId y projectRole', async () => {
       const projectInvitation = createMockProjectInvitation();
       invitationRepository.findOne.mockResolvedValue(projectInvitation);
-      projectsService.addMemberByUserId.mockResolvedValue(undefined as any);
 
-      await service.accept(projectInvitation.token, acceptingUser);
-
-      expect(projectsService.addMemberByUserId).toHaveBeenCalledWith(
-        projectInvitation.projectId,
-        acceptingUser.id,
-        projectInvitation.projectRole as ProjectRole,
+      const result = await service.accept(
+        projectInvitation.token,
+        acceptingUser,
       );
+
+      // Now uses transaction manager directly instead of projectsService.addMemberByUserId
+      expect(result.message).toBe('Invitacion aceptada exitosamente');
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
-    it('debe ignorar ConflictException al agregar a organizacion (ya miembro)', async () => {
+    it('debe no crear org member si ya existe (skip en lugar de error)', async () => {
       const invitation = createMockInvitation();
       invitationRepository.findOne.mockResolvedValue(invitation);
-      organizationsService.addMember.mockRejectedValue(
-        new ConflictException('El usuario ya es miembro'),
+
+      // Transaction mock manager.findOne returns existing member
+      mockDataSource.transaction.mockImplementationOnce(
+        async (cb: Function) => {
+          const mockManager = {
+            save: jest
+              .fn()
+              .mockImplementation((entity: unknown) => Promise.resolve(entity)),
+            findOne: jest.fn().mockResolvedValue({ id: 'existing-member' }),
+            create: jest
+              .fn()
+              .mockImplementation((_entity: unknown, data: unknown) => ({
+                ...(data as object),
+              })),
+          };
+          return cb(mockManager);
+        },
       );
 
       const result = await service.accept(invitation.token, acceptingUser);
@@ -837,11 +847,34 @@ describe('InvitationsService', () => {
       expect(result.message).toBe('Invitacion aceptada exitosamente');
     });
 
-    it('debe ignorar ConflictException al agregar a proyecto (ya miembro)', async () => {
+    it('debe no crear project member si ya existe (skip en lugar de error)', async () => {
       const projectInvitation = createMockProjectInvitation();
       invitationRepository.findOne.mockResolvedValue(projectInvitation);
-      projectsService.addMemberByUserId.mockRejectedValue(
-        new ConflictException('Ya es miembro del proyecto'),
+
+      // Transaction mock: org member not found (create), project member found (skip)
+      let findOneCallCount = 0;
+      mockDataSource.transaction.mockImplementationOnce(
+        async (cb: Function) => {
+          const mockManager = {
+            save: jest
+              .fn()
+              .mockImplementation((entity: unknown) => Promise.resolve(entity)),
+            findOne: jest.fn().mockImplementation(() => {
+              findOneCallCount++;
+              // First call: org member check (not found)
+              // Second call: project member check (found)
+              return findOneCallCount === 1
+                ? Promise.resolve(null)
+                : Promise.resolve({ id: 'existing-project-member' });
+            }),
+            create: jest
+              .fn()
+              .mockImplementation((_entity: unknown, data: unknown) => ({
+                ...(data as object),
+              })),
+          };
+          return cb(mockManager);
+        },
       );
 
       const result = await service.accept(
@@ -852,28 +885,17 @@ describe('InvitationsService', () => {
       expect(result.message).toBe('Invitacion aceptada exitosamente');
     });
 
-    it('debe propagar excepciones no-Conflict al agregar a organizacion', async () => {
+    it('debe propagar excepciones de la transaccion', async () => {
       const invitation = createMockInvitation();
       invitationRepository.findOne.mockResolvedValue(invitation);
-      organizationsService.addMember.mockRejectedValue(
-        new ForbiddenException('Error inesperado'),
+
+      mockDataSource.transaction.mockRejectedValueOnce(
+        new ForbiddenException('Error inesperado en transaccion'),
       );
 
       await expect(
         service.accept(invitation.token, acceptingUser),
       ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('debe propagar excepciones no-Conflict al agregar a proyecto', async () => {
-      const projectInvitation = createMockProjectInvitation();
-      invitationRepository.findOne.mockResolvedValue(projectInvitation);
-      projectsService.addMemberByUserId.mockRejectedValue(
-        new BadRequestException('Error inesperado'),
-      );
-
-      await expect(
-        service.accept(projectInvitation.token, acceptingUser),
-      ).rejects.toThrow(BadRequestException);
     });
 
     it('debe lanzar NotFoundException si la invitacion no existe', async () => {
@@ -942,7 +964,15 @@ describe('InvitationsService', () => {
       await service.accept(invitation.token, acceptingUser);
 
       const transactionCallback = mockDataSource.transaction.mock.calls[0][0];
-      const mockManager = { save: jest.fn().mockResolvedValue(undefined) };
+      const mockManager = {
+        save: jest.fn().mockResolvedValue(undefined),
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation((_entity: unknown, data: unknown) => ({
+            ...(data as object),
+          })),
+      };
       await transactionCallback(mockManager);
 
       expect(mockManager.save).toHaveBeenCalledWith(

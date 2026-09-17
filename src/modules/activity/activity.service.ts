@@ -20,18 +20,26 @@ export class ActivityService {
     projectId?: string;
     taskId?: string;
     metadata?: Record<string, any>;
-  }): Promise<ActivityLog> {
-    const entry = this.activityRepository.create({
-      userId: params.userId,
-      type: params.type,
-      description: params.description,
-      organizationId: params.organizationId ?? null,
-      projectId: params.projectId ?? null,
-      taskId: params.taskId ?? null,
-      metadata: params.metadata ?? null,
-    });
-    await this.activityRepository.save(entry);
-    return entry;
+  }): Promise<ActivityLog | null> {
+    try {
+      const entry = this.activityRepository.create({
+        userId: params.userId,
+        type: params.type,
+        description: params.description,
+        organizationId: params.organizationId ?? null,
+        projectId: params.projectId ?? null,
+        taskId: params.taskId ?? null,
+        metadata: params.metadata ?? null,
+      });
+      await this.activityRepository.save(entry);
+      return entry;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to log activity: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Don't rethrow — activity logging is secondary
+      return null;
+    }
   }
 
   async findByProject(
@@ -84,11 +92,9 @@ export class ActivityService {
       );
     }
 
-    const targetDate = date ? new Date(date) : new Date();
-    const start = new Date(targetDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(targetDate);
-    end.setHours(23, 59, 59, 999);
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    const start = new Date(dateStr + 'T00:00:00.000Z');
+    const end = new Date(dateStr + 'T23:59:59.999Z');
 
     return this.activityRepository.find({
       where: {

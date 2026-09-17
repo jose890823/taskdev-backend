@@ -86,6 +86,7 @@ export class TasksService {
         if (assigneeId !== user.id) {
           this.eventEmitter.emit('task.assigned', {
             taskId: task.id,
+            projectId: task.projectId || undefined,
             taskTitle: task.title,
             taskPriority: task.priority,
             assignedToId: assigneeId,
@@ -480,20 +481,42 @@ export class TasksService {
         ? (await this.getTaskAssignees(id)).map((a) => a.id)
         : [];
 
+    // CW-40: Wrap assignee update + task save in a transaction
     if (dto.assignedToIds !== undefined) {
       // Validate subtask restriction
       if (task.parentId) {
         await this.validateSubtaskAssignees(task.parentId, dto.assignedToIds);
       }
-      await this.saveAssignees(id, dto.assignedToIds);
       // Sync legacy field to keep single-assignee column in sync
       dto.assignedToId = dto.assignedToIds[0] ?? null;
     }
 
     // Remove assignedToIds from dto before saving to task table
-    const { assignedToIds: _, ...taskDto } = dto;
+    const { assignedToIds: assignedToIdsFromDto, ...taskDto } = dto;
     Object.assign(task, taskDto);
-    const savedTask = await this.taskRepository.save(task);
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    let savedTask: Task;
+    try {
+      if (assignedToIdsFromDto !== undefined) {
+        await queryRunner.manager.delete(TaskAssignee, { taskId: id });
+        if (assignedToIdsFromDto.length > 0) {
+          const entities = assignedToIdsFromDto.map((userId) =>
+            this.taskAssigneeRepository.create({ taskId: id, userId }),
+          );
+          await queryRunner.manager.save(TaskAssignee, entities);
+        }
+      }
+      savedTask = await queryRunner.manager.save(Task, task);
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
 
     const assignees = await this.getTaskAssignees(id);
 
@@ -512,6 +535,7 @@ export class TasksService {
           if (!oldSet.has(uid) && uid !== currentUser.id) {
             this.eventEmitter.emit('task.assigned', {
               taskId: id,
+              projectId: savedTask.projectId || undefined,
               taskTitle,
               taskPriority: savedTask.priority || task.priority,
               assignedToId: uid,
@@ -525,6 +549,7 @@ export class TasksService {
           if (!newSet.has(uid) && uid !== currentUser.id) {
             this.eventEmitter.emit('task.unassigned', {
               taskId: id,
+              projectId: savedTask.projectId || undefined,
               taskTitle,
               taskPriority: savedTask.priority || task.priority,
               unassignedUserId: uid,
@@ -546,6 +571,7 @@ export class TasksService {
 
         this.eventEmitter.emit('task.status_changed', {
           taskId: id,
+          projectId: savedTask.projectId || undefined,
           taskTitle,
           taskPriority: savedTask.priority || task.priority,
           oldStatusName: oldStatus?.name || 'Sin estado',
@@ -558,6 +584,7 @@ export class TasksService {
         if (newStatus.isCompleted) {
           this.eventEmitter.emit('task.completed', {
             taskId: id,
+            projectId: savedTask.projectId || undefined,
             taskTitle,
             taskPriority: savedTask.priority || task.priority,
             completedByName: actorName,
@@ -573,6 +600,8 @@ export class TasksService {
 
   async remove(identifier: string): Promise<void> {
     const task = await this.findById(identifier);
+    // CW-41: Soft-delete direct subtasks before soft-deleting parent
+    await this.taskRepository.softDelete({ parentId: task.id });
     await this.taskRepository.softDelete(task.id);
   }
 
@@ -642,6 +671,7 @@ export class TasksService {
     if (parentAssignees.length > 0) {
       this.eventEmitter.emit('subtask.created', {
         parentTaskId: parentId,
+        projectId: subtask.projectId || undefined,
         parentTaskTitle: parent.title,
         subtaskTitle: subtask.title,
         taskPriority: subtask.priority,
@@ -715,6 +745,7 @@ export class TasksService {
     taskIds: string[],
     userId: string,
     isSuperAdmin = false,
+    boundProjectId?: string,
   ): Promise<void> {
     if (isSuperAdmin || taskIds.length === 0) return;
 
@@ -729,6 +760,13 @@ export class TasksService {
     const projectIds = [
       ...new Set(tasks.map((t) => t.projectId).filter(Boolean)),
     ] as string[];
+
+    if (
+      boundProjectId &&
+      (projectIds.length !== 1 || projectIds[0] !== boundProjectId)
+    ) {
+      throw new ForbiddenException('Acceso al proyecto denegado');
+    }
 
     // For tasks without projectId, verify creator
     const personalTasks = tasks.filter((t) => !t.projectId);
@@ -759,8 +797,10 @@ export class TasksService {
     taskId: string,
     userId: string,
     isSuperAdmin = false,
+    boundProjectId?: string,
   ): Promise<Task> {
     const task = await this.findById(taskId);
+    this.assertBoundProject(task.projectId, boundProjectId);
     if (isSuperAdmin) return task;
     if (task.createdById === userId) return task;
     if (task.assignedToId === userId) return task;
@@ -820,8 +860,10 @@ export class TasksService {
     taskId: string,
     userId: string,
     isSuperAdmin = false,
+    boundProjectId?: string,
   ): Promise<Task> {
     const task = await this.findById(taskId);
+    this.assertBoundProject(task.projectId, boundProjectId);
     if (isSuperAdmin) return task;
     if (!task.projectId) {
       if (task.createdById !== userId)
@@ -843,8 +885,10 @@ export class TasksService {
     taskId: string,
     userId: string,
     isSuperAdmin = false,
+    boundProjectId?: string,
   ): Promise<Task> {
     const task = await this.findById(taskId);
+    this.assertBoundProject(task.projectId, boundProjectId);
     if (isSuperAdmin) return task;
     if (!task.projectId) {
       if (task.createdById !== userId)
@@ -864,6 +908,15 @@ export class TasksService {
   }
 
   // ── Helpers ──
+
+  private assertBoundProject(
+    taskProjectId: string | null,
+    boundProjectId?: string,
+  ): void {
+    if (boundProjectId && taskProjectId !== boundProjectId) {
+      throw new ForbiddenException('Acceso al proyecto denegado');
+    }
+  }
 
   async getTaskAssignees(
     taskId: string,

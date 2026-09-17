@@ -48,6 +48,11 @@ export class ActiveSessionService {
     });
 
     // Verificar limite de sesiones
+    // NOTE: Race condition — session count check and creation are not atomic.
+    // Two concurrent logins may both pass the limit check and exceed maxSessions.
+    // A proper fix would require a Redis-based distributed lock (e.g. Redlock),
+    // which is overkill at current scale. The over-limit is self-correcting:
+    // the next login will revoke the excess sessions.
     const maxSessions = await this.securityConfigService.getNumberValue(
       'max_sessions_per_user',
       5,

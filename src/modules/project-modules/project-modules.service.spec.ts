@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ProjectModulesService } from './project-modules.service';
 import { ProjectModule } from './entities/project-module.entity';
 import { CreateProjectModuleDto } from './dto/create-project-module.dto';
@@ -11,6 +11,15 @@ import { ReorderModulesDto } from './dto/reorder-modules.dto';
 describe('ProjectModulesService', () => {
   let service: ProjectModulesService;
   let moduleRepository: jest.Mocked<Repository<ProjectModule>>;
+  let mockQueryRunnerManager: { update: jest.Mock };
+  let mockQueryRunner: {
+    connect: jest.Mock;
+    startTransaction: jest.Mock;
+    commitTransaction: jest.Mock;
+    rollbackTransaction: jest.Mock;
+    release: jest.Mock;
+    manager: { update: jest.Mock };
+  };
 
   const projectId = '550e8400-e29b-41d4-a716-446655440000';
   const moduleId = '660e8400-e29b-41d4-a716-446655440001';
@@ -90,12 +99,30 @@ describe('ProjectModulesService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    mockQueryRunnerManager = { update: jest.fn() };
+    mockQueryRunner = {
+      connect: jest.fn(),
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(),
+      release: jest.fn(),
+      manager: mockQueryRunnerManager,
+    };
+
+    const mockDataSource = {
+      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectModulesService,
         {
           provide: getRepositoryToken(ProjectModule),
           useValue: mockModuleRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -487,26 +514,35 @@ describe('ProjectModulesService', () => {
   // ──────────────────────────────────────────────
 
   describe('reorder', () => {
-    it('debe actualizar las posiciones de los modulos en el orden dado', async () => {
+    it('debe actualizar las posiciones de los modulos en el orden dado dentro de una transaccion', async () => {
       const id1 = '110e8400-e29b-41d4-a716-446655440011';
       const id2 = '220e8400-e29b-41d4-a716-446655440022';
       const id3 = '330e8400-e29b-41d4-a716-446655440033';
 
       const reorderDto: ReorderModulesDto = { ids: [id3, id1, id2] };
-      moduleRepository.update.mockResolvedValue({ affected: 1 } as any);
 
       await service.reorder(reorderDto);
 
-      expect(moduleRepository.update).toHaveBeenCalledTimes(3);
-      expect(moduleRepository.update).toHaveBeenCalledWith(id3, {
-        position: 0,
-      });
-      expect(moduleRepository.update).toHaveBeenCalledWith(id1, {
-        position: 1,
-      });
-      expect(moduleRepository.update).toHaveBeenCalledWith(id2, {
-        position: 2,
-      });
+      expect(mockQueryRunner.connect).toHaveBeenCalled();
+      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledTimes(3);
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledWith(
+        ProjectModule,
+        id3,
+        { position: 0 },
+      );
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledWith(
+        ProjectModule,
+        id1,
+        { position: 1 },
+      );
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledWith(
+        ProjectModule,
+        id2,
+        { position: 2 },
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
     });
 
     it('debe manejar un array vacio sin llamar a update', async () => {
@@ -514,19 +550,38 @@ describe('ProjectModulesService', () => {
 
       await service.reorder(reorderDto);
 
-      expect(moduleRepository.update).not.toHaveBeenCalled();
+      expect(mockQueryRunnerManager.update).not.toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
     });
 
     it('debe manejar un solo modulo correctamente', async () => {
       const reorderDto: ReorderModulesDto = { ids: [moduleId] };
-      moduleRepository.update.mockResolvedValue({ affected: 1 } as any);
 
       await service.reorder(reorderDto);
 
-      expect(moduleRepository.update).toHaveBeenCalledTimes(1);
-      expect(moduleRepository.update).toHaveBeenCalledWith(moduleId, {
-        position: 0,
-      });
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunnerManager.update).toHaveBeenCalledWith(
+        ProjectModule,
+        moduleId,
+        { position: 0 },
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('debe hacer rollback si una actualizacion falla', async () => {
+      const reorderDto: ReorderModulesDto = { ids: [moduleId] };
+      mockQueryRunnerManager.update.mockRejectedValue(
+        new Error('DB connection lost'),
+      );
+
+      await expect(service.reorder(reorderDto)).rejects.toThrow(
+        'DB connection lost',
+      );
+
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.release).toHaveBeenCalled();
     });
   });
 });

@@ -1,9 +1,15 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TaskStatus } from './entities/task-status.entity';
 import { CreateTaskStatusDto, UpdateTaskStatusDto } from './dto';
+import { Task } from '../tasks/entities/task.entity';
 
 @Injectable()
 export class TaskStatusesService {
@@ -12,6 +18,7 @@ export class TaskStatusesService {
   constructor(
     @InjectRepository(TaskStatus)
     private readonly statusRepository: Repository<TaskStatus>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /** Escuchar evento project.created para crear statuses default */
@@ -160,7 +167,18 @@ export class TaskStatusesService {
 
   async remove(id: string): Promise<void> {
     await this.findById(id);
-    await this.statusRepository.delete(id);
+
+    // CW-15: Check if any tasks reference this status before deleting
+    const tasksUsingStatus = await this.dataSource
+      .getRepository(Task)
+      .count({ where: { statusId: id } });
+    if (tasksUsingStatus > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar: ${tasksUsingStatus} tarea(s) usan este estado`,
+      );
+    }
+
+    await this.statusRepository.softDelete(id);
   }
 
   async getDefaultStatus(projectId: string | null): Promise<TaskStatus | null> {

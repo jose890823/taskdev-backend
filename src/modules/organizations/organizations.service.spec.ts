@@ -59,8 +59,12 @@ describe('OrganizationsService', () => {
       const mockManager = {
         save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
         create: jest.fn().mockImplementation((_EntityClass, data) => data),
+        findOne: jest.fn().mockResolvedValue(null),
       };
       return cb(mockManager);
+    }),
+    getRepository: jest.fn().mockReturnValue({
+      findOne: jest.fn().mockResolvedValue({ id: 'some-user-id' }),
     }),
   };
 
@@ -118,23 +122,37 @@ describe('OrganizationsService', () => {
     };
 
     it('debe crear una organizacion y agregar al owner como miembro', async () => {
-      orgRepository.findOne.mockResolvedValue(null);
-
       const result = await service.create(createDto, mockUser);
 
-      expect(orgRepository.findOne).toHaveBeenCalledWith({
-        where: { slug: 'acme-corp' },
-      });
       expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
 
     it('debe lanzar ConflictException si ya existe una organizacion con ese slug', async () => {
-      orgRepository.findOne.mockResolvedValue(mockOrg);
+      // Override transaction mock so manager.findOne returns an existing org
+      mockDataSource.transaction.mockImplementationOnce(async (cb) => {
+        const mockManager = {
+          save: jest.fn(),
+          create: jest.fn(),
+          findOne: jest.fn().mockResolvedValue(mockOrg),
+        };
+        return cb(mockManager);
+      });
 
       await expect(service.create(createDto, mockUser)).rejects.toThrow(
         ConflictException,
       );
+
+      // Re-override for second call
+      mockDataSource.transaction.mockImplementationOnce(async (cb) => {
+        const mockManager = {
+          save: jest.fn(),
+          create: jest.fn(),
+          findOne: jest.fn().mockResolvedValue(mockOrg),
+        };
+        return cb(mockManager);
+      });
+
       await expect(service.create(createDto, mockUser)).rejects.toThrow(
         'Ya existe una organizacion con ese nombre',
       );

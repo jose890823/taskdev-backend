@@ -162,7 +162,9 @@ describe('NotificationsService', () => {
 
     service = module.get<NotificationsService>(NotificationsService);
     notificationRepository = module.get(getRepositoryToken(Notification));
-    preferenceRepository = module.get(getRepositoryToken(NotificationPreference));
+    preferenceRepository = module.get(
+      getRepositoryToken(NotificationPreference),
+    );
     userRepository = module.get(getRepositoryToken(User));
     notificationQueue = module.get(getQueueToken('notifications'));
   });
@@ -183,6 +185,7 @@ describe('NotificationsService', () => {
   describe('create', () => {
     const createDto: CreateNotificationDto = {
       userId: mockUserId,
+      projectId: 'project-1',
       type: NotificationType.TASK_ASSIGNED,
       title: 'Tarea asignada',
       message: 'Juan te asigno la tarea "Test"',
@@ -203,6 +206,7 @@ describe('NotificationsService', () => {
       expect(notificationRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: mockUserId,
+          projectId: 'project-1',
           type: NotificationType.TASK_ASSIGNED,
           channel: NotificationChannel.IN_APP,
           title: 'Tarea asignada',
@@ -210,7 +214,9 @@ describe('NotificationsService', () => {
           actionUrl: '/tasks/123',
         }),
       );
-      expect(notificationRepository.save).toHaveBeenCalledWith(mockNotification);
+      expect(notificationRepository.save).toHaveBeenCalledWith(
+        mockNotification,
+      );
     });
 
     it('should return null when user preferences disable all channels', async () => {
@@ -363,14 +369,11 @@ describe('NotificationsService', () => {
       notificationRepository.create.mockReturnValue(mockNotification);
       notificationRepository.save.mockResolvedValue(mockNotification);
 
-      const result = await service.createMany(
-        [mockUserId, mockUserId2],
-        {
-          type: NotificationType.SYSTEM_ANNOUNCEMENT,
-          title: 'Anuncio',
-          message: 'Mensaje global',
-        },
-      );
+      const result = await service.createMany([mockUserId, mockUserId2], {
+        type: NotificationType.SYSTEM_ANNOUNCEMENT,
+        title: 'Anuncio',
+        message: 'Mensaje global',
+      });
 
       expect(result).toBe(2);
     });
@@ -380,14 +383,11 @@ describe('NotificationsService', () => {
 
       preferenceRepository.findOne.mockResolvedValue(mockPref);
 
-      const result = await service.createMany(
-        [mockUserId, mockUserId2],
-        {
-          type: NotificationType.SYSTEM_ANNOUNCEMENT,
-          title: 'Anuncio',
-          message: 'Mensaje global',
-        },
-      );
+      const result = await service.createMany([mockUserId, mockUserId2], {
+        type: NotificationType.SYSTEM_ANNOUNCEMENT,
+        title: 'Anuncio',
+        message: 'Mensaje global',
+      });
 
       // Both should return null (preferences disabled), so created = 0
       expect(result).toBe(0);
@@ -404,14 +404,11 @@ describe('NotificationsService', () => {
       notificationRepository.create.mockReturnValue(mockNotification);
       notificationRepository.save.mockResolvedValue(mockNotification);
 
-      const result = await service.createMany(
-        [mockUserId, mockUserId2],
-        {
-          type: NotificationType.SYSTEM_ANNOUNCEMENT,
-          title: 'Anuncio',
-          message: 'Test',
-        },
-      );
+      const result = await service.createMany([mockUserId, mockUserId2], {
+        type: NotificationType.SYSTEM_ANNOUNCEMENT,
+        title: 'Anuncio',
+        message: 'Test',
+      });
 
       expect(result).toBe(1);
     });
@@ -469,6 +466,22 @@ describe('NotificationsService', () => {
           }),
         }),
       );
+    });
+
+    it('should constrain project-scoped notification queries', async () => {
+      notificationRepository.findAndCount.mockResolvedValue([[], 0]);
+      notificationRepository.count.mockResolvedValue(0);
+
+      await service.findByUser(mockUserId, { projectId: 'project-1' });
+
+      expect(notificationRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: mockUserId, projectId: 'project-1' },
+        }),
+      );
+      expect(notificationRepository.count).toHaveBeenCalledWith({
+        where: { userId: mockUserId, projectId: 'project-1', isRead: false },
+      });
     });
 
     it('should apply status filter', async () => {
@@ -557,6 +570,23 @@ describe('NotificationsService', () => {
       });
     });
 
+    it('should constrain detail lookup to the requested project', async () => {
+      const mockNotification = createMockNotification({
+        projectId: 'project-1',
+      });
+      notificationRepository.findOne.mockResolvedValue(mockNotification);
+
+      await service.findById(mockNotificationId, mockUserId, 'project-1');
+
+      expect(notificationRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          id: mockNotificationId,
+          userId: mockUserId,
+          projectId: 'project-1',
+        },
+      });
+    });
+
     it('should throw NotFoundException when notification not found', async () => {
       notificationRepository.findOne.mockResolvedValue(null);
 
@@ -590,6 +620,16 @@ describe('NotificationsService', () => {
       });
     });
 
+    it('should count unread notifications only within a project', async () => {
+      notificationRepository.count.mockResolvedValue(2);
+
+      await service.getUnreadCount(mockUserId, 'project-1');
+
+      expect(notificationRepository.count).toHaveBeenCalledWith({
+        where: { userId: mockUserId, isRead: false, projectId: 'project-1' },
+      });
+    });
+
     it('should return 0 when no unread notifications', async () => {
       notificationRepository.count.mockResolvedValue(0);
 
@@ -612,8 +652,28 @@ describe('NotificationsService', () => {
       const result = await service.markAsRead(mockNotificationId, mockUserId);
 
       expect(mockNotification.markAsRead).toHaveBeenCalled();
-      expect(notificationRepository.save).toHaveBeenCalledWith(mockNotification);
+      expect(notificationRepository.save).toHaveBeenCalledWith(
+        mockNotification,
+      );
       expect(result).toEqual(mockNotification);
+    });
+
+    it('should constrain read mutation to the requested project', async () => {
+      const mockNotification = createMockNotification({
+        projectId: 'project-1',
+      });
+      notificationRepository.findOne.mockResolvedValue(mockNotification);
+      notificationRepository.save.mockResolvedValue(mockNotification);
+
+      await service.markAsRead(mockNotificationId, mockUserId, 'project-1');
+
+      expect(notificationRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          id: mockNotificationId,
+          userId: mockUserId,
+          projectId: 'project-1',
+        },
+      });
     });
 
     it('should throw NotFoundException when notification not found', async () => {
@@ -645,6 +705,17 @@ describe('NotificationsService', () => {
       );
     });
 
+    it('should mark unread notifications only within a project', async () => {
+      notificationRepository.update.mockResolvedValue({ affected: 1 } as any);
+
+      await service.markAllAsRead(mockUserId, 'project-1');
+
+      expect(notificationRepository.update).toHaveBeenCalledWith(
+        { userId: mockUserId, isRead: false, projectId: 'project-1' },
+        expect.anything(),
+      );
+    });
+
     it('should return 0 when no unread notifications exist', async () => {
       notificationRepository.update.mockResolvedValue({ affected: 0 } as any);
 
@@ -667,6 +738,25 @@ describe('NotificationsService', () => {
 
       expect(result).toBe(2);
       expect(notificationRepository.update).toHaveBeenCalled();
+    });
+
+    it('should mark specified IDs only within a project', async () => {
+      notificationRepository.update.mockResolvedValue({ affected: 1 } as any);
+
+      await service.markManyAsRead(
+        [mockNotificationId],
+        mockUserId,
+        'project-1',
+      );
+
+      expect(notificationRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: mockUserId,
+          isRead: false,
+          projectId: 'project-1',
+        }),
+        expect.anything(),
+      );
     });
 
     it('should return 0 when none of the ids match', async () => {
@@ -699,12 +789,24 @@ describe('NotificationsService', () => {
       });
     });
 
+    it('should delete a notification only within a project', async () => {
+      notificationRepository.delete.mockResolvedValue({ affected: 1 } as any);
+
+      await service.delete(mockNotificationId, mockUserId, 'project-1');
+
+      expect(notificationRepository.delete).toHaveBeenCalledWith({
+        id: mockNotificationId,
+        userId: mockUserId,
+        projectId: 'project-1',
+      });
+    });
+
     it('should throw NotFoundException when notification not found', async () => {
       notificationRepository.delete.mockResolvedValue({ affected: 0 } as any);
 
-      await expect(
-        service.delete('non-existent', mockUserId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.delete('non-existent', mockUserId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -722,6 +824,18 @@ describe('NotificationsService', () => {
       expect(notificationRepository.delete).toHaveBeenCalledWith({
         userId: mockUserId,
         isRead: true,
+      });
+    });
+
+    it('should delete read notifications only within a project', async () => {
+      notificationRepository.delete.mockResolvedValue({ affected: 1 } as any);
+
+      await service.deleteAllRead(mockUserId, 'project-1');
+
+      expect(notificationRepository.delete).toHaveBeenCalledWith({
+        userId: mockUserId,
+        isRead: true,
+        projectId: 'project-1',
       });
     });
 
@@ -815,8 +929,8 @@ describe('NotificationsService', () => {
       preferenceRepository.findOne.mockResolvedValue(null);
       preferenceRepository.create.mockReturnValue(newPref);
       preferenceRepository.save
-        .mockResolvedValueOnce(newPref)     // from getOrCreatePreferences
-        .mockResolvedValueOnce(newPref);    // from updatePreferences save
+        .mockResolvedValueOnce(newPref) // from getOrCreatePreferences
+        .mockResolvedValueOnce(newPref); // from updatePreferences save
 
       await service.updatePreferences(mockUserId, { emailEnabled: false });
 
@@ -867,10 +981,9 @@ describe('NotificationsService', () => {
 
     it('should query all active users for ALL_USERS audience', async () => {
       const mockQb = createMockQueryBuilder({
-        getMany: jest.fn().mockResolvedValue([
-          { id: mockUserId },
-          { id: mockUserId2 },
-        ]),
+        getMany: jest
+          .fn()
+          .mockResolvedValue([{ id: mockUserId }, { id: mockUserId2 }]),
       });
       userRepository.createQueryBuilder.mockReturnValue(mockQb as any);
 

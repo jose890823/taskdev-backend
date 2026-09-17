@@ -4,6 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -56,6 +57,9 @@ export class TaskStatus {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date | null;
 
   constructor(partial: Partial<TaskStatus>) {
     Object.assign(this, partial);

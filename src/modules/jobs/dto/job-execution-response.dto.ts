@@ -18,7 +18,7 @@ export class JobExecutionResponseDto {
   jobName: string;
 
   @ApiProperty({
-    example: 'michambita-jobs',
+    example: 'taskhub-jobs',
     description: 'Nombre de la cola donde se ejecuto',
   })
   queueName: string;

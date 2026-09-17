@@ -78,6 +78,7 @@ export enum NotificationStatus {
  */
 @Entity('notifications')
 @Index(['userId'])
+@Index(['projectId', 'userId', 'isRead'])
 @Index(['type'])
 @Index(['status'])
 @Index(['isRead'])
@@ -115,6 +116,20 @@ export class Notification {
 
   @Column({ type: 'uuid' })
   userId: string;
+
+  // ============================================
+  // PROYECTO DE ORIGEN (NULL = SISTEMA/ORGANIZACIÓN)
+  // ============================================
+
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description:
+      'ID del proyecto al que pertenece la notificación; null para notificaciones de sistema u organización',
+    required: false,
+    nullable: true,
+  })
+  @Column({ type: 'uuid', nullable: true })
+  projectId: string | null;
 
   // ============================================
   // TIPO Y CANAL

@@ -157,7 +157,7 @@ describe('SearchService', () => {
 
       await service.findByCode('ORG-260218-B2C3');
 
-      const queryArg = dataSource.query.mock.calls[0][0] as string;
+      const queryArg = dataSource.query.mock.calls[0][0];
       expect(queryArg).toContain('"id"');
       expect(queryArg).toContain('"systemCode"');
       expect(queryArg).toContain('"name"');
@@ -173,7 +173,7 @@ describe('SearchService', () => {
 
       await service.findByCode('TSK-260218-A3K7');
 
-      const queryArg = dataSource.query.mock.calls[0][0] as string;
+      const queryArg = dataSource.query.mock.calls[0][0];
       expect(queryArg).toContain('"title"');
       expect(queryArg).toContain('"priority"');
       expect(queryArg).toContain('"assignedToId"');
@@ -188,7 +188,7 @@ describe('SearchService', () => {
 
       await service.findByCode('PRJ-260218-D4F1');
 
-      const queryArg = dataSource.query.mock.calls[0][0] as string;
+      const queryArg = dataSource.query.mock.calls[0][0];
       expect(queryArg).toContain('"color"');
       expect(queryArg).toContain('"organizationId"');
       expect(queryArg).toContain('"parentId"');
@@ -199,7 +199,7 @@ describe('SearchService', () => {
 
       await service.findByCode('TSK-260218-A3K7');
 
-      const queryArg = dataSource.query.mock.calls[0][0] as string;
+      const queryArg = dataSource.query.mock.calls[0][0];
       const paramsArg = dataSource.query.mock.calls[0][1];
       expect(queryArg).toContain('$1');
       expect(paramsArg).toEqual(['TSK-260218-A3K7']);
@@ -210,7 +210,7 @@ describe('SearchService', () => {
 
       await service.findByCode('ORG-260218-B2C3');
 
-      const queryArg = dataSource.query.mock.calls[0][0] as string;
+      const queryArg = dataSource.query.mock.calls[0][0];
       expect(queryArg).toContain('"deletedAt" IS NULL');
     });
 
@@ -225,21 +225,15 @@ describe('SearchService', () => {
     });
 
     it('debe lanzar BadRequestException si el codigo es string vacio', async () => {
-      await expect(service.findByCode('')).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.findByCode('')).rejects.toThrow(
-        'Codigo invalido',
-      );
+      await expect(service.findByCode('')).rejects.toThrow(BadRequestException);
+      await expect(service.findByCode('')).rejects.toThrow('Codigo invalido');
     });
 
     it('debe lanzar BadRequestException si el codigo tiene menos de 3 caracteres', async () => {
       await expect(service.findByCode('AB')).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.findByCode('AB')).rejects.toThrow(
-        'Codigo invalido',
-      );
+      await expect(service.findByCode('AB')).rejects.toThrow('Codigo invalido');
     });
 
     it('debe lanzar BadRequestException si el codigo es undefined', async () => {
@@ -310,7 +304,10 @@ describe('SearchService', () => {
     });
 
     it('debe retornar solo el primer resultado (LIMIT 1)', async () => {
-      dataSource.query.mockResolvedValue([mockTask, { ...mockTask, id: 'otro-id' }]);
+      dataSource.query.mockResolvedValue([
+        mockTask,
+        { ...mockTask, id: 'otro-id' },
+      ]);
 
       const result = await service.findByCode('TSK-260218-A3K7');
 

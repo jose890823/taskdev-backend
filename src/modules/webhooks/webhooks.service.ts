@@ -99,19 +99,40 @@ export class WebhooksService {
   }
 
   /**
-   * Marcar evento como procesando
+   * Marcar evento como procesando.
+   * Uses an atomic UPDATE with WHERE clause to prevent two workers from
+   * processing the same event concurrently (optimistic lock pattern).
+   * Returns null if the event was already claimed by another worker.
    */
-  async markProcessing(id: string): Promise<void> {
+  async markProcessing(id: string): Promise<WebhookEvent | null> {
+    const result = await this.webhookEventRepository
+      .createQueryBuilder()
+      .update(WebhookEvent)
+      .set({
+        status: WebhookEventStatus.PROCESSING,
+        attempts: () => 'attempts + 1',
+      })
+      .where('id = :id AND status = :status', {
+        id,
+        status: WebhookEventStatus.RECEIVED,
+      })
+      .execute();
+
+    if (result.affected === 0) {
+      // Already being processed by another worker or not in RECEIVED state
+      this.logger.warn(
+        `Webhook ${id} no pudo ser marcado como procesando (ya reclamado o estado incompatible)`,
+      );
+      return null;
+    }
+
     const event = await this.findEventOrFail(id);
-
-    event.status = WebhookEventStatus.PROCESSING;
-    event.attempts += 1;
-
-    await this.webhookEventRepository.save(event);
 
     this.logger.log(
       `Webhook ${event.systemCode} marcado como procesando (intento ${event.attempts})`,
     );
+
+    return event;
   }
 
   /**

@@ -317,7 +317,7 @@ export class EmailService {
    */
   async sendOtpEmail(dto: SendOtpEmailDto): Promise<EmailResult> {
     if (this.provider === 'none') {
-      this.logger.log(`📧 [SIMULADO] OTP para ${dto.to}: ${dto.otpCode}`);
+      this.logger.debug(`📧 [SIMULADO] OTP para ${dto.to}: ***`);
       return { success: true, messageId: 'simulated' };
     }
 

@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -110,9 +107,7 @@ describe('StorageConfigService', () => {
     };
 
     const mockEncryptionService = {
-      encrypt: jest
-        .fn()
-        .mockImplementation((v: string) => `encrypted:${v}`),
+      encrypt: jest.fn().mockImplementation((v: string) => `encrypted:${v}`),
       decrypt: jest
         .fn()
         .mockImplementation((v: string) =>
@@ -190,9 +185,7 @@ describe('StorageConfigService', () => {
 
       expect(localCall).toBeDefined();
       expect((localCall![0] as Partial<StorageConfig>).isActive).toBe(true);
-      expect((localCall![0] as Partial<StorageConfig>).isConfigured).toBe(
-        true,
-      );
+      expect((localCall![0] as Partial<StorageConfig>).isConfigured).toBe(true);
     });
 
     it('should set non-LOCAL providers as inactive by default', async () => {
@@ -345,9 +338,9 @@ describe('StorageConfigService', () => {
       cacheManager.get.mockResolvedValue(null);
       repository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.getConfig(StorageProviderType.S3),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getConfig(StorageProviderType.S3)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -357,10 +350,7 @@ describe('StorageConfigService', () => {
 
   describe('getAllConfigs', () => {
     it('should return all configs ordered by provider', async () => {
-      const configs = [
-        createMockStorageConfig(),
-        createMockS3Config(),
-      ];
+      const configs = [createMockStorageConfig(), createMockS3Config()];
       repository.find.mockResolvedValue(configs);
 
       const result = await service.getAllConfigs();
@@ -567,10 +557,7 @@ describe('StorageConfigService', () => {
       const result = await service.activateProvider(StorageProviderType.S3);
 
       expect(result.isActive).toBe(true);
-      expect(repository.update).toHaveBeenCalledWith(
-        {},
-        { isActive: false },
-      );
+      expect(repository.update).toHaveBeenCalledWith({}, { isActive: false });
       expect(repository.save).toHaveBeenCalled();
     });
 
@@ -592,10 +579,7 @@ describe('StorageConfigService', () => {
 
       await service.activateProvider(StorageProviderType.LOCAL);
 
-      expect(repository.update).toHaveBeenCalledWith(
-        {},
-        { isActive: false },
-      );
+      expect(repository.update).toHaveBeenCalledWith({}, { isActive: false });
     });
 
     it('should invalidate all cache after activation', async () => {
@@ -699,8 +683,7 @@ describe('StorageConfigService', () => {
     it('should decrypt sensitive fields for S3', async () => {
       const s3Config = createMockS3Config();
       (s3Config.config as S3Config).accessKeyId = 'encrypted:AKIA_KEY';
-      (s3Config.config as S3Config).secretAccessKey =
-        'encrypted:SECRET_KEY';
+      (s3Config.config as S3Config).secretAccessKey = 'encrypted:SECRET_KEY';
 
       cacheManager.get.mockResolvedValue(null);
       repository.findOne.mockResolvedValue(s3Config);

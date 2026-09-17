@@ -11,6 +11,8 @@ import {
 @Injectable()
 export class BlockedIpService {
   private readonly logger = new Logger(BlockedIpService.name);
+  // TODO: In multi-instance deployments, blocked IPs should be stored in Redis
+  // instead of in-memory Set. Current implementation only works with single-instance.
   private blockedIpsCache: Set<string> = new Set();
   private lastCacheUpdate: Date | null = null;
   private readonly CACHE_TTL_MS = 60000; // 1 minuto

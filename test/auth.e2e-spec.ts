@@ -12,7 +12,6 @@ import {
   closeE2EApp,
   getServer,
   loginAsSuperAdmin,
-  createTestUser,
   cleanupTestData,
   getDataSource,
   authGet,
@@ -63,17 +62,13 @@ describe('Auth (e2e)', () => {
     const server = getServer(app);
 
     // Register
-    await request(server)
-      .post('/api/auth/register')
-      .send(payload)
-      .expect(201);
+    await request(server).post('/api/auth/register').send(payload).expect(201);
 
     // Verify email directly in DB
     const ds = getDataSource();
-    await ds.query(
-      `UPDATE users SET "emailVerified" = true WHERE email = $1`,
-      [payload.email],
-    );
+    await ds.query(`UPDATE users SET "emailVerified" = true WHERE email = $1`, [
+      payload.email,
+    ]);
 
     // Login
     const loginRes = await request(server)
@@ -83,7 +78,7 @@ describe('Auth (e2e)', () => {
 
     return {
       email: payload.email,
-      password: payload.password as string,
+      password: payload.password,
       accessToken: loginRes.body.data.accessToken as string,
       refreshToken: loginRes.body.data.refreshToken as string,
       user: loginRes.body.data.user,
@@ -348,9 +343,7 @@ describe('Auth (e2e)', () => {
     it('18 — should reject request without token (401)', async () => {
       const server = getServer(app);
 
-      const res = await request(server)
-        .get('/api/auth/me')
-        .expect(401);
+      const res = await request(server).get('/api/auth/me').expect(401);
 
       expect(res.body.success).toBe(false);
     });
@@ -432,11 +425,9 @@ describe('Auth (e2e)', () => {
     it('24 — should list active sessions', async () => {
       const { accessToken } = await registerVerifyAndLogin();
 
-      const res = await authGet(
-        app,
-        '/api/auth/sessions',
-        accessToken,
-      ).expect(200);
+      const res = await authGet(app, '/api/auth/sessions', accessToken).expect(
+        200,
+      );
 
       expect(res.body.success).toBe(true);
       expect(Array.isArray(res.body.data)).toBe(true);
@@ -445,9 +436,7 @@ describe('Auth (e2e)', () => {
     it('25 — should reject sessions request without auth (401)', async () => {
       const server = getServer(app);
 
-      const res = await request(server)
-        .get('/api/auth/sessions')
-        .expect(401);
+      const res = await request(server).get('/api/auth/sessions').expect(401);
 
       expect(res.body.success).toBe(false);
     });
@@ -531,10 +520,10 @@ describe('Auth (e2e)', () => {
 
       // Read OTP directly from the database
       const ds = getDataSource();
-      const rows = (await ds.query(
+      const rows = await ds.query(
         `SELECT "otpCode" FROM users WHERE email = $1`,
         [email],
-      )) as { otpCode: string }[];
+      );
 
       expect(rows.length).toBe(1);
       const otpCode = rows[0].otpCode;
@@ -704,11 +693,9 @@ describe('Auth (e2e)', () => {
     it('40 — should access /me as super admin', async () => {
       const { tokens } = await loginAsSuperAdmin(app);
 
-      const res = await authGet(
-        app,
-        '/api/auth/me',
-        tokens.accessToken,
-      ).expect(200);
+      const res = await authGet(app, '/api/auth/me', tokens.accessToken).expect(
+        200,
+      );
 
       expect(res.body.success).toBe(true);
       expect(res.body.data.email).toBeDefined();
@@ -762,7 +749,6 @@ describe('Auth (e2e)', () => {
 
     it('43 — after logout-all, refresh token should be invalid', async () => {
       const { accessToken, refreshToken } = await registerVerifyAndLogin();
-      const server = getServer(app);
 
       // Logout all sessions
       await authPost(app, '/api/auth/logout-all', accessToken)
@@ -773,8 +759,9 @@ describe('Auth (e2e)', () => {
       // Note: The JWT itself may still be cryptographically valid, but the
       // server-side comparison (bcrypt of refresh token) will fail because
       // the user's stored refreshToken was set to null.
-      const res = await authPost(app, '/api/auth/refresh', accessToken)
-        .send({ refreshToken });
+      const res = await authPost(app, '/api/auth/refresh', accessToken).send({
+        refreshToken,
+      });
 
       // Expect 401 — the refresh strategy validates the JWT signature,
       // but the auth service will reject because user.refreshToken is null

@@ -7,3 +7,4 @@ export * from './update-preferences.dto';
 export * from './notification-query.dto';
 export * from './send-broadcast.dto';
 export * from './update-event-config.dto';
+export * from './mark-many-as-read.dto';

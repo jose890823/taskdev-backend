@@ -88,11 +88,13 @@ export class I18nService implements OnModuleInit {
    */
   async loadTranslations(): Promise<void> {
     const translations = await this.translationRepository.find();
-    this.cache.clear();
+    // Build new cache atomically — no window where cache is empty
+    const newCache = new Map<string, string>();
     for (const t of translations) {
-      this.cache.set(`${t.locale}:${t.key}`, t.value);
+      newCache.set(`${t.locale}:${t.key}`, t.value);
     }
-    this.logger.log(`Cargadas ${translations.length} traducciones en cache`);
+    this.cache = newCache;
+    this.logger.log(`Cargadas ${newCache.size} traducciones en cache`);
   }
 
   /**

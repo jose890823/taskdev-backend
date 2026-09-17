@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -35,12 +36,15 @@ export class OrganizationsService {
   async create(dto: CreateOrganizationDto, user: User): Promise<Organization> {
     const slug = this.generateSlug(dto.name);
 
-    const existing = await this.orgRepository.findOne({ where: { slug } });
-    if (existing) {
-      throw new ConflictException('Ya existe una organizacion con ese nombre');
-    }
-
     return this.dataSource.transaction(async (manager) => {
+      // CW-12: Slug uniqueness check inside transaction to prevent TOCTOU race
+      const existing = await manager.findOne(Organization, { where: { slug } });
+      if (existing) {
+        throw new ConflictException(
+          'Ya existe una organizacion con ese nombre',
+        );
+      }
+
       const org = manager.create(Organization, {
         ...dto,
         slug,
@@ -145,6 +149,21 @@ export class OrganizationsService {
   ): Promise<OrganizationMember> {
     const org = await this.findById(identifier);
     await this.verifyAdminAccess(org.id, requestUserId);
+
+    // CW-11: Prevent assigning OWNER role via addMember
+    if (dto.role === OrganizationRole.OWNER) {
+      throw new BadRequestException(
+        'No se puede asignar el rol de propietario. Use la transferencia de propiedad.',
+      );
+    }
+
+    // CW-10: Validate userId exists before creating member
+    const userExists = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: dto.userId }, select: ['id'] });
+    if (!userExists) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
 
     const existing = await this.memberRepository.findOne({
       where: { organizationId: org.id, userId: dto.userId },

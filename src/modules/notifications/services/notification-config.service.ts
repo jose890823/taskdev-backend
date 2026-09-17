@@ -96,6 +96,8 @@ const EVENT_SEEDS: Array<{
 @Injectable()
 export class NotificationConfigService implements OnApplicationBootstrap {
   private readonly logger = new Logger(NotificationConfigService.name);
+  // TODO: In multi-instance deployments, this cache should be Redis-backed
+  // to ensure config changes propagate across all instances.
   private configCache: Map<string, boolean> = new Map();
 
   constructor(
@@ -109,16 +111,27 @@ export class NotificationConfigService implements OnApplicationBootstrap {
   }
 
   /**
-   * Seed de configuraciones de eventos si no existen
+   * Seed de configuraciones de eventos si no existen.
+   * Uses atomic upsert (ON CONFLICT DO NOTHING) to avoid race conditions
+   * when multiple instances start simultaneously.
    */
   async seedEventConfigs(): Promise<void> {
     for (const seed of EVENT_SEEDS) {
-      const existing = await this.configRepository.findOne({
-        where: { eventType: seed.eventType },
-      });
+      const result = await this.configRepository
+        .createQueryBuilder()
+        .insert()
+        .into(NotificationEventConfig)
+        .values({
+          eventType: seed.eventType,
+          label: seed.label,
+          description: seed.description,
+          isEnabled: seed.isEnabled,
+          category: seed.category,
+        })
+        .orIgnore() // ON CONFLICT DO NOTHING
+        .execute();
 
-      if (!existing) {
-        await this.configRepository.save(this.configRepository.create(seed));
+      if (result.identifiers.length > 0 && result.identifiers[0]?.id) {
         this.logger.log(`Evento creado: ${seed.eventType}`);
       }
     }

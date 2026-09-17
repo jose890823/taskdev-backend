@@ -69,6 +69,7 @@ export class NotificationProcessor {
       actionText?: string;
       referenceId?: string;
       referenceType?: string;
+      projectId?: string;
       metadata?: Record<string, any>;
     }>,
   ): Promise<void> {
@@ -89,6 +90,7 @@ export class NotificationProcessor {
       // Crear registro de notificación email
       const notification = this.notificationRepository.create({
         userId: data.userId,
+        projectId: data.projectId || null,
         type: data.type,
         channel: NotificationChannel.EMAIL,
         priority: NotificationPriority.NORMAL,
@@ -130,11 +132,15 @@ export class NotificationProcessor {
           this.logger.error(`Error enviando email: ${emailMsg}`);
         }
       } else {
-        // Si no hay servicio de email, marcar como enviado (simulado)
-        notification.status = NotificationStatus.SENT;
-        notification.sentAt = new Date();
+        // Si no hay servicio de email, marcar como FAILED — no simular envío
+        notification.status = NotificationStatus.FAILED;
+        notification.failureReason = 'EmailService not available';
+        notification.metadata = {
+          ...notification.metadata,
+          skippedReason: 'no_email_provider',
+        };
         this.logger.warn(
-          'EmailService no disponible, notificación marcada como enviada',
+          'EmailService no disponible, notificación marcada como fallida',
         );
       }
 
@@ -168,44 +174,60 @@ export class NotificationProcessor {
 
     let processed = 0;
     let failed = 0;
+    const BATCH_SIZE = 50;
 
-    for (const userId of data.userIds) {
-      try {
-        // Crear notificación in-app
-        const notification = this.notificationRepository.create({
-          userId,
-          type: NotificationType.SYSTEM_ANNOUNCEMENT,
-          channel: NotificationChannel.IN_APP,
-          priority: data.priority,
-          status: NotificationStatus.DELIVERED,
-          title: data.title,
-          message: data.message,
-          actionUrl: data.actionUrl || null,
-          actionText: data.actionText || null,
-          icon: 'megaphone',
-          sentAt: new Date(),
-          deliveredAt: new Date(),
-        });
+    for (let i = 0; i < data.userIds.length; i += BATCH_SIZE) {
+      const batch = data.userIds.slice(i, i + BATCH_SIZE);
 
-        await this.notificationRepository.save(notification);
-        processed++;
-
-        // Encolar email si está habilitado
-        if (data.sendEmail) {
-          await this.notificationQueue.add('send-email', {
+      const results = await Promise.allSettled(
+        batch.map(async (userId) => {
+          // Crear notificación in-app
+          const notification = this.notificationRepository.create({
             userId,
             type: NotificationType.SYSTEM_ANNOUNCEMENT,
+            channel: NotificationChannel.IN_APP,
+            priority: data.priority,
+            status: NotificationStatus.DELIVERED,
             title: data.title,
             message: data.message,
-            actionUrl: data.actionUrl,
-            actionText: data.actionText,
+            actionUrl: data.actionUrl || null,
+            actionText: data.actionText || null,
+            icon: 'megaphone',
+            sentAt: new Date(),
+            deliveredAt: new Date(),
           });
+
+          await this.notificationRepository.save(notification);
+
+          // Encolar email si está habilitado
+          if (data.sendEmail) {
+            await this.notificationQueue.add('send-email', {
+              userId,
+              type: NotificationType.SYSTEM_ANNOUNCEMENT,
+              title: data.title,
+              message: data.message,
+              actionUrl: data.actionUrl,
+              actionText: data.actionText,
+            });
+          }
+        }),
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          processed++;
+        } else {
+          failed++;
+          this.logger.error(
+            `Error en broadcast: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+          );
         }
-      } catch (error: unknown) {
-        failed++;
-        const msg = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Error en broadcast para usuario ${userId}: ${msg}`);
       }
+
+      // Report progress to Bull job
+      await job.progress(
+        Math.round(((i + batch.length) / data.userIds.length) * 100),
+      );
     }
 
     this.logger.log(
@@ -232,6 +254,7 @@ export class NotificationProcessor {
     // El digest real se procesará con un cron job separado
     const notification = this.notificationRepository.create({
       userId: data.userId,
+      projectId: data.notification.projectId || null,
       type: data.notification.type,
       channel: NotificationChannel.EMAIL,
       priority: NotificationPriority.LOW,

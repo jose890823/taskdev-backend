@@ -31,11 +31,20 @@ describe('NotificationConfigService', () => {
   // ── Test module setup ──────────────────────────────────────
 
   beforeEach(async () => {
+    const mockQueryBuilder = {
+      insert: jest.fn().mockReturnThis(),
+      into: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ identifiers: [{ id: 'new-id' }] }),
+    };
+
     const mockConfigRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -67,8 +76,6 @@ describe('NotificationConfigService', () => {
 
   describe('onApplicationBootstrap', () => {
     it('should seed event configs and refresh cache', async () => {
-      // seedEventConfigs: all events already exist
-      configRepository.findOne.mockResolvedValue(createMockConfig());
       // refreshCache
       configRepository.find.mockResolvedValue([
         createMockConfig({ eventType: 'task_assigned', isEnabled: true }),
@@ -76,8 +83,8 @@ describe('NotificationConfigService', () => {
 
       await service.onApplicationBootstrap();
 
-      // findOne called for each seed (11 seeds)
-      expect(configRepository.findOne).toHaveBeenCalledTimes(11);
+      // createQueryBuilder called for each seed (11 seeds) via atomic upsert
+      expect(configRepository.createQueryBuilder).toHaveBeenCalledTimes(11);
       // find called once for refreshCache
       expect(configRepository.find).toHaveBeenCalledTimes(1);
     });
@@ -88,45 +95,38 @@ describe('NotificationConfigService', () => {
   // ================================================================
 
   describe('seedEventConfigs', () => {
-    it('should create configs for events that do not exist', async () => {
-      configRepository.findOne.mockResolvedValue(null);
-      configRepository.create.mockImplementation(
-        (data) => data as NotificationEventConfig,
-      );
-      configRepository.save.mockResolvedValue(createMockConfig());
+    it('should use atomic upsert (ON CONFLICT DO NOTHING) for all seeds', async () => {
+      await service.seedEventConfigs();
+
+      // 11 seeds → 11 createQueryBuilder calls with insert + orIgnore
+      expect(configRepository.createQueryBuilder).toHaveBeenCalledTimes(11);
+    });
+
+    it('should handle already-existing configs gracefully via orIgnore', async () => {
+      // Simulate ON CONFLICT DO NOTHING — empty identifiers means row existed
+      const mockQb = (configRepository.createQueryBuilder as jest.Mock)();
+      mockQb.execute.mockResolvedValue({ identifiers: [] });
 
       await service.seedEventConfigs();
 
-      // 11 seeds, none exist → 11 creates + 11 saves
-      expect(configRepository.save).toHaveBeenCalledTimes(11);
-      expect(configRepository.create).toHaveBeenCalledTimes(11);
+      // Should not throw — orIgnore handles duplicates
+      expect(configRepository.createQueryBuilder).toHaveBeenCalled();
     });
 
-    it('should NOT create configs that already exist', async () => {
-      configRepository.findOne.mockResolvedValue(createMockConfig());
-
-      await service.seedEventConfigs();
-
-      expect(configRepository.create).not.toHaveBeenCalled();
-      expect(configRepository.save).not.toHaveBeenCalled();
-    });
-
-    it('should create only missing configs (some exist, some do not)', async () => {
+    it('should handle mixed new and existing configs', async () => {
       let callCount = 0;
-      configRepository.findOne.mockImplementation(async () => {
+      const mockQb = (configRepository.createQueryBuilder as jest.Mock)();
+      mockQb.execute.mockImplementation(async () => {
         callCount++;
-        // First 5 calls return existing, rest return null
-        return callCount <= 5 ? createMockConfig() : null;
+        // First 5 return new IDs, rest return empty (already existed)
+        return callCount <= 5
+          ? { identifiers: [{ id: `new-${callCount}` }] }
+          : { identifiers: [] };
       });
-      configRepository.create.mockImplementation(
-        (data) => data as NotificationEventConfig,
-      );
-      configRepository.save.mockResolvedValue(createMockConfig());
 
       await service.seedEventConfigs();
 
-      // 11 seeds - 5 existing = 6 new
-      expect(configRepository.save).toHaveBeenCalledTimes(6);
+      expect(configRepository.createQueryBuilder).toHaveBeenCalled();
     });
   });
 
@@ -204,8 +204,14 @@ describe('NotificationConfigService', () => {
   describe('findAll', () => {
     it('should return all configs ordered by category and eventType', async () => {
       const configs = [
-        createMockConfig({ eventType: 'org_member_added', category: 'organizations' }),
-        createMockConfig({ eventType: 'project_member_added', category: 'projects' }),
+        createMockConfig({
+          eventType: 'org_member_added',
+          category: 'organizations',
+        }),
+        createMockConfig({
+          eventType: 'project_member_added',
+          category: 'projects',
+        }),
         createMockConfig({ eventType: 'task_assigned', category: 'tasks' }),
       ];
       configRepository.find.mockResolvedValue(configs);

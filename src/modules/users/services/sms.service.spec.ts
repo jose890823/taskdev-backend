@@ -24,9 +24,8 @@ describe('SmsService', () => {
 
   // Helper to get the mock messages.create function from a service instance
   const getMessagesCreateMock = (): jest.Mock => {
-    const twilioInstance = MockedTwilio.mock.results[
-      MockedTwilio.mock.results.length - 1
-    ]?.value;
+    const twilioInstance =
+      MockedTwilio.mock.results[MockedTwilio.mock.results.length - 1]?.value;
     return twilioInstance?.messages?.create;
   };
 
@@ -35,7 +34,10 @@ describe('SmsService', () => {
    */
   const createServiceWithConfig = async (
     config: Record<string, string | undefined>,
-  ): Promise<{ service: SmsService; configService: jest.Mocked<ConfigService> }> => {
+  ): Promise<{
+    service: SmsService;
+    configService: jest.Mocked<ConfigService>;
+  }> => {
     const mockConfigService = {
       get: jest.fn().mockImplementation((key: string) => config[key]),
     };

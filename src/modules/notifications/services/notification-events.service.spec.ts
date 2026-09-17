@@ -116,6 +116,7 @@ describe('NotificationEventsService', () => {
   describe('handleTaskAssigned', () => {
     const payload = {
       taskId: mockTaskId,
+      projectId: mockProjectId,
       taskTitle: 'Disenar landing page',
       taskPriority: 'high',
       assignedToId: mockUserId,
@@ -136,6 +137,7 @@ describe('NotificationEventsService', () => {
           actionUrl: `/tasks/${mockTaskId}`,
           referenceId: mockTaskId,
           referenceType: 'task',
+          projectId: mockProjectId,
         }),
       );
 

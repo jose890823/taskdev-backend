@@ -13,16 +13,13 @@ import {
   createE2EApp,
   closeE2EApp,
   getServer,
-  loginAsSuperAdmin,
   createTestUser,
   cleanupTestData,
-  getDataSource,
   authGet,
   authPost,
   authPatch,
   authDelete,
   AuthenticatedUser,
-  clearSecurityRecords,
 } from './helpers/e2e-setup';
 
 describe('Daily Tasks (e2e)', () => {

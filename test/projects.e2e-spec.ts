@@ -13,12 +13,10 @@ import {
   loginAsSuperAdmin,
   createTestUser,
   cleanupTestData,
-  getDataSource,
   authGet,
   authPost,
   authPatch,
   authDelete,
-  clearSecurityRecords,
   AuthenticatedUser,
 } from './helpers/e2e-setup';
 
@@ -64,7 +62,13 @@ describe('Projects (e2e)', () => {
 
       const body = res.body as {
         success: boolean;
-        data: { id: string; slug: string; name: string; organizationId: string | null; ownerId: string };
+        data: {
+          id: string;
+          slug: string;
+          name: string;
+          organizationId: string | null;
+          ownerId: string;
+        };
       };
       expect(body.success).toBe(true);
       expect(body.data.name).toBe('E2E Personal Project');
@@ -329,9 +333,7 @@ describe('Projects (e2e)', () => {
       const body = res.body as {
         data: Array<{ userId: string; role: string }>;
       };
-      const ownerMember = body.data.find(
-        (m) => m.userId === userAuth.user.id,
-      );
+      const ownerMember = body.data.find((m) => m.userId === userAuth.user.id);
       expect(ownerMember).toBeDefined();
       expect(ownerMember!.role).toBe('owner');
     });
@@ -384,9 +386,7 @@ describe('Projects (e2e)', () => {
       const body = res.body as {
         data: Array<{ userId: string }>;
       };
-      const removed = body.data.find(
-        (m) => m.userId === user2Auth.user.id,
-      );
+      const removed = body.data.find((m) => m.userId === user2Auth.user.id);
       expect(removed).toBeUndefined();
     });
 
@@ -596,7 +596,28 @@ describe('Projects (e2e)', () => {
       expect(names).toContain('Backend');
     });
 
-    it('26. Should update module', async () => {
+    it('26. Should resolve reorder before the dynamic module id route', async () => {
+      const listRes = await authGet(
+        app,
+        `/api/projects/${personalProjectId}/modules?flat=true`,
+        userAuth.tokens.accessToken,
+      ).expect(200);
+
+      const listBody = listRes.body as {
+        data: Array<{ id: string }>;
+      };
+      const ids = listBody.data.map((module) => module.id);
+
+      await authPatch(
+        app,
+        `/api/project-modules/reorder?projectId=${personalProjectId}`,
+        userAuth.tokens.accessToken,
+      )
+        .send({ ids: ids.reverse() })
+        .expect(200);
+    });
+
+    it('27. Should update module', async () => {
       const res = await authPatch(
         app,
         `/api/project-modules/${projectModuleId}`,
@@ -614,7 +635,7 @@ describe('Projects (e2e)', () => {
       expect(body.data.description).toBe('Updated frontend module');
     });
 
-    it('27. Should delete module', async () => {
+    it('28. Should delete module', async () => {
       // Create a disposable module to delete
       const createRes = await authPost(
         app,
@@ -645,13 +666,11 @@ describe('Projects (e2e)', () => {
       const listBody = listRes.body as {
         data: Array<{ id: string }>;
       };
-      const found = listBody.data.find(
-        (m) => m.id === disposableModuleId,
-      );
+      const found = listBody.data.find((m) => m.id === disposableModuleId);
       expect(found).toBeUndefined();
     });
 
-    it('28. Should reject module operations by non-admin', async () => {
+    it('29. Should reject module operations by non-admin', async () => {
       // user2 is a regular member — should NOT be able to create modules
       await authPost(
         app,
@@ -684,31 +703,53 @@ describe('Projects (e2e)', () => {
   // ═══════════════════════════════════════════════════════════════
 
   describe('Cross-cutting', () => {
-    it('29. Should reject all operations without auth (401)', async () => {
+    it('30. Should reject all operations without auth (401)', async () => {
       const server = getServer(app);
-      /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- supertest + getHttpServer() both return any by design */
+
       const req = request as unknown as (app: unknown) => request.Agent;
 
       // Project CRUD
-      await req(server).post('/api/projects').send({ name: 'No Auth' }).expect(401);
+      await req(server)
+        .post('/api/projects')
+        .send({ name: 'No Auth' })
+        .expect(401);
       await req(server).get('/api/projects').expect(401);
       await req(server).get(`/api/projects/${personalProjectId}`).expect(401);
-      await req(server).patch(`/api/projects/${personalProjectId}`).send({ name: 'X' }).expect(401);
-      await req(server).delete(`/api/projects/${personalProjectId}`).expect(401);
+      await req(server)
+        .patch(`/api/projects/${personalProjectId}`)
+        .send({ name: 'X' })
+        .expect(401);
+      await req(server)
+        .delete(`/api/projects/${personalProjectId}`)
+        .expect(401);
 
       // Members
-      await req(server).get(`/api/projects/${personalProjectId}/members`).expect(401);
-      await req(server).post(`/api/projects/${personalProjectId}/members`).send({}).expect(401);
+      await req(server)
+        .get(`/api/projects/${personalProjectId}/members`)
+        .expect(401);
+      await req(server)
+        .post(`/api/projects/${personalProjectId}/members`)
+        .send({})
+        .expect(401);
 
       // Statuses
-      await req(server).get(`/api/projects/${personalProjectId}/statuses`).expect(401);
-      await req(server).post(`/api/projects/${personalProjectId}/statuses`).send({}).expect(401);
+      await req(server)
+        .get(`/api/projects/${personalProjectId}/statuses`)
+        .expect(401);
+      await req(server)
+        .post(`/api/projects/${personalProjectId}/statuses`)
+        .send({})
+        .expect(401);
       await req(server).get('/api/task-statuses/global').expect(401);
 
       // Modules
-      await req(server).get(`/api/projects/${personalProjectId}/modules`).expect(401);
-      await req(server).post(`/api/projects/${personalProjectId}/modules`).send({}).expect(401);
-      /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+      await req(server)
+        .get(`/api/projects/${personalProjectId}/modules`)
+        .expect(401);
+      await req(server)
+        .post(`/api/projects/${personalProjectId}/modules`)
+        .send({})
+        .expect(401);
     });
 
     it('30. Super admin should have access to any project', async () => {
@@ -728,11 +769,7 @@ describe('Projects (e2e)', () => {
     });
 
     it('31. Should reject creating project with invalid organizationId (400)', async () => {
-      await authPost(
-        app,
-        '/api/projects',
-        userAuth.tokens.accessToken,
-      )
+      await authPost(app, '/api/projects', userAuth.tokens.accessToken)
         .send({ name: 'Bad Org', organizationId: 'not-a-uuid' })
         .expect(400);
     });
@@ -762,9 +799,7 @@ describe('Projects (e2e)', () => {
       const listBody = listRes.body as {
         data: Array<{ id: string }>;
       };
-      const found = listBody.data.find(
-        (p) => p.id === user2ProjectId,
-      );
+      const found = listBody.data.find((p) => p.id === user2ProjectId);
       expect(found).toBeUndefined();
     });
 

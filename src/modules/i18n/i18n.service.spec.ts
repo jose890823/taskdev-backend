@@ -589,9 +589,9 @@ describe('I18nService', () => {
         .mockResolvedValueOnce(existing) // findById
         .mockResolvedValueOnce(conflicting); // conflict found
 
-      await expect(
-        service.update(mockTranslationId, dto),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.update(mockTranslationId, dto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should allow updating when conflict is the same translation', async () => {
@@ -814,7 +814,7 @@ describe('I18nService', () => {
       await service.findAll({} as TranslationFilterDto);
 
       // andWhere should not be called with isSystem
-      const calls = (mockQb.andWhere as jest.Mock).mock.calls;
+      const calls = mockQb.andWhere.mock.calls;
       const isSystemCalls = calls.filter(
         (c: any[]) => typeof c[0] === 'string' && c[0].includes('isSystem'),
       );
@@ -930,9 +930,7 @@ describe('I18nService', () => {
       );
       translationRepository.find.mockResolvedValue([]);
 
-      const items = [
-        { key: 'existing.key', locale: 'es', value: 'New value' },
-      ];
+      const items = [{ key: 'existing.key', locale: 'es', value: 'New value' }];
 
       const result = await service.bulkImport(items);
 
@@ -998,9 +996,7 @@ describe('I18nService', () => {
       );
       translationRepository.find.mockResolvedValue([]);
 
-      await service.bulkImport([
-        { key: 'test', locale: 'es', value: 'test' },
-      ]);
+      await service.bulkImport([{ key: 'test', locale: 'es', value: 'test' }]);
 
       // find is called during loadTranslations (cache reload)
       expect(translationRepository.find).toHaveBeenCalled();

@@ -9,12 +9,12 @@ import {
 } from '../entities/job-execution.entity';
 
 /**
- * Procesador central de jobs de MiChambita
+ * Procesador central de jobs de TaskHub
  * Ejecuta todas las tareas programadas y manuales
  */
-@Processor('michambita-jobs')
-export class MichambitaJobsProcessor {
-  private readonly logger = new Logger(MichambitaJobsProcessor.name);
+@Processor('taskhub-jobs')
+export class TaskhubJobsProcessor {
+  private readonly logger = new Logger(TaskhubJobsProcessor.name);
 
   constructor(
     private readonly dataSource: DataSource,
@@ -37,7 +37,7 @@ export class MichambitaJobsProcessor {
     try {
       const execution = this.jobExecutionRepository.create({
         jobName,
-        queueName: 'michambita-jobs',
+        queueName: 'taskhub-jobs',
         status: JobExecutionStatus.PROCESSING,
         input: input && Object.keys(input).length > 0 ? input : null,
         attemptNumber,
@@ -50,7 +50,7 @@ export class MichambitaJobsProcessor {
       );
       return new JobExecution({
         jobName,
-        queueName: 'michambita-jobs',
+        queueName: 'taskhub-jobs',
         status: JobExecutionStatus.PROCESSING,
       });
     }

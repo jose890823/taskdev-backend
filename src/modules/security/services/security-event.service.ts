@@ -24,6 +24,15 @@ export interface CreateSecurityEventDto {
   city?: string | null;
 }
 
+/** Whitelist of allowed sortBy fields to prevent SQL injection */
+const ALLOWED_SORT_FIELDS = [
+  'createdAt',
+  'eventType',
+  'severity',
+  'ipAddress',
+  'userId',
+];
+
 @Injectable()
 export class SecurityEventService {
   private readonly logger = new Logger(SecurityEventService.name);
@@ -137,11 +146,11 @@ export class SecurityEventService {
       });
     }
 
-    // Ordenamiento
-    queryBuilder.orderBy(
-      `event.${filter.sortBy || 'createdAt'}`,
-      filter.sortOrder || 'DESC',
-    );
+    // Ordenamiento — validate sortBy against whitelist to prevent SQL injection
+    const safeSortBy = ALLOWED_SORT_FIELDS.includes(filter.sortBy || '')
+      ? filter.sortBy!
+      : 'createdAt';
+    queryBuilder.orderBy(`event.${safeSortBy}`, filter.sortOrder || 'DESC');
 
     // Paginacion
     const page = filter.page || 1;

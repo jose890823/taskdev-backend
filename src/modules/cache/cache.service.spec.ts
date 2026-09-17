@@ -19,6 +19,7 @@ const mockRedisClient = {
   ping: jest.fn(),
   quit: jest.fn(),
   on: jest.fn(),
+  eval: jest.fn(),
 };
 
 // Mock del modulo ioredis — retorna nuestro mock client
@@ -191,6 +192,24 @@ describe('CacheService', () => {
     });
   });
 
+  describe('incrementWithTtl', () => {
+    it('uses one atomic Redis script for the counter and TTL', async () => {
+      mockRedisClient.eval.mockResolvedValue([3, 8]);
+
+      await expect(service.incrementWithTtl('rate-key', 10)).resolves.toEqual({
+        count: 3,
+        retryAfter: 8,
+      });
+
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.stringContaining("redis.call('INCR', KEYS[1])"),
+        1,
+        'rate-key',
+        10,
+      );
+    });
+  });
+
   // ============================================
   // DEL
   // ============================================
@@ -226,7 +245,7 @@ describe('CacheService', () => {
       // Simular scan con una iteracion: retorna cursor '0' (fin) y 2 claves
       mockRedisClient.scan.mockResolvedValue([
         '0',
-        ['mchb:products:1', 'mchb:products:2'],
+        ['taskhub:products:1', 'taskhub:products:2'],
       ]);
       mockRedisClient.del.mockResolvedValue(2);
 
@@ -235,14 +254,14 @@ describe('CacheService', () => {
       expect(mockRedisClient.scan).toHaveBeenCalledWith(
         '0',
         'MATCH',
-        'mchb:products:*',
+        'taskhub:products:*',
         'COUNT',
         100,
       );
       // Las claves deben tener el prefijo removido
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        'roducts:1',
-        'roducts:2',
+        'products:1',
+        'products:2',
       );
       expect(count).toBe(2);
     });
@@ -250,8 +269,8 @@ describe('CacheService', () => {
     it('debe manejar multiples iteraciones de SCAN', async () => {
       // Primera iteracion: cursor='5', segunda: cursor='0' (fin)
       mockRedisClient.scan
-        .mockResolvedValueOnce(['5', ['mchb:cats:1']])
-        .mockResolvedValueOnce(['0', ['mchb:cats:2']]);
+        .mockResolvedValueOnce(['5', ['taskhub:cats:1']])
+        .mockResolvedValueOnce(['0', ['taskhub:cats:2']]);
       mockRedisClient.del.mockResolvedValue(1);
 
       const count = await service.delByPattern('cats:*');
@@ -278,13 +297,13 @@ describe('CacheService', () => {
       expect(count).toBe(0);
     });
 
-    it('debe manejar claves sin prefijo mchb:', async () => {
+    it('debe manejar claves sin prefijo taskhub:', async () => {
       mockRedisClient.scan.mockResolvedValue(['0', ['other:key']]);
       mockRedisClient.del.mockResolvedValue(1);
 
       const count = await service.delByPattern('other:*');
 
-      // La clave no empieza con 'mchb:', se pasa tal cual
+      // La clave no empieza con 'taskhub:', se pasa tal cual
       expect(mockRedisClient.del).toHaveBeenCalledWith('other:key');
       expect(count).toBe(1);
     });
@@ -422,9 +441,7 @@ describe('CacheService', () => {
       mockRedisClient.get.mockResolvedValue(null);
       const factory = jest.fn().mockRejectedValue(new Error('DB down'));
 
-      await expect(service.getOrSet('key', factory)).rejects.toThrow(
-        'DB down',
-      );
+      await expect(service.getOrSet('key', factory)).rejects.toThrow('DB down');
     });
 
     it('debe ejecutar factory si Redis falla al leer (resiliente)', async () => {
@@ -454,7 +471,7 @@ describe('CacheService', () => {
       expect(mockRedisClient.scan).toHaveBeenCalledWith(
         '0',
         'MATCH',
-        'mchb:products:*',
+        'taskhub:products:*',
         'COUNT',
         100,
       );
@@ -464,7 +481,7 @@ describe('CacheService', () => {
     it('debe retornar la cantidad de claves eliminadas', async () => {
       mockRedisClient.scan.mockResolvedValue([
         '0',
-        ['mchb:stores:a', 'mchb:stores:b', 'mchb:stores:c'],
+        ['taskhub:stores:a', 'taskhub:stores:b', 'taskhub:stores:c'],
       ]);
       mockRedisClient.del.mockResolvedValue(3);
 
@@ -479,26 +496,32 @@ describe('CacheService', () => {
   // ============================================
 
   describe('static keys', () => {
-    it('debe generar clave de categoria', () => {
-      expect(CacheService.keys.category('abc')).toBe('categories:abc');
+    it('debe generar clave de tarea', () => {
+      expect(CacheService.keys.task('abc')).toBe('tasks:abc');
     });
 
-    it('debe generar clave de arbol de categorias', () => {
-      expect(CacheService.keys.categoryTree()).toBe('categories:tree');
+    it('debe generar clave de lista de tareas', () => {
+      expect(CacheService.keys.taskList('hash123')).toBe('tasks:list:hash123');
     });
 
-    it('debe generar clave de producto', () => {
-      expect(CacheService.keys.product('prod-1')).toBe('products:prod-1');
+    it('debe generar clave de proyecto', () => {
+      expect(CacheService.keys.project('proj-1')).toBe('projects:proj-1');
     });
 
-    it('debe generar clave de lista de productos', () => {
-      expect(CacheService.keys.productList('hash123')).toBe(
-        'products:list:hash123',
+    it('debe generar clave de lista de proyectos', () => {
+      expect(CacheService.keys.projectList('hash456')).toBe(
+        'projects:list:hash456',
       );
     });
 
-    it('debe generar clave de tienda', () => {
-      expect(CacheService.keys.store('store-1')).toBe('stores:store-1');
+    it('debe generar clave de organizacion', () => {
+      expect(CacheService.keys.organization('org-1')).toBe(
+        'organizations:org-1',
+      );
+    });
+
+    it('debe generar clave de usuario', () => {
+      expect(CacheService.keys.user('user-1')).toBe('users:user-1');
     });
 
     it('debe generar clave de feature flag', () => {
@@ -507,17 +530,13 @@ describe('CacheService', () => {
       );
     });
 
-    it('debe generar clave de todos los feature flags', () => {
-      expect(CacheService.keys.featureFlagsAll()).toBe('flags:all');
+    it('debe generar clave de estado de tarea', () => {
+      expect(CacheService.keys.taskStatus('proj-1')).toBe('statuses:proj-1');
     });
 
-    it('debe generar clave de zonas de envio', () => {
-      expect(CacheService.keys.shippingZones('s1')).toBe('shipping:zones:s1');
-    });
-
-    it('debe generar clave de regla de comision', () => {
-      expect(CacheService.keys.commissionRule('s2')).toBe(
-        'commissions:rule:s2',
+    it('debe generar clave de notificacion', () => {
+      expect(CacheService.keys.notification('user-1')).toBe(
+        'notifications:user-1',
       );
     });
   });
@@ -620,16 +639,16 @@ describe('CacheService', () => {
     it('debe retornar claves que coincidan con el patron', async () => {
       mockRedisClient.scan.mockResolvedValue([
         '0',
-        ['mchb:products:1', 'mchb:products:2'],
+        ['taskhub:products:1', 'taskhub:products:2'],
       ]);
 
       const keys = await service.listKeys('products:*');
 
-      expect(keys).toEqual(['roducts:1', 'roducts:2']);
+      expect(keys).toEqual(['products:1', 'products:2']);
       expect(mockRedisClient.scan).toHaveBeenCalledWith(
         '0',
         'MATCH',
-        'mchb:products:*',
+        'taskhub:products:*',
         'COUNT',
         100,
       );
@@ -639,7 +658,7 @@ describe('CacheService', () => {
       // Retorna 3 claves pero limite es 2
       mockRedisClient.scan.mockResolvedValue([
         '5',
-        ['mchb:items:1', 'mchb:items:2', 'mchb:items:3'],
+        ['taskhub:items:1', 'taskhub:items:2', 'taskhub:items:3'],
       ]);
 
       const keys = await service.listKeys('items:*', 2);
@@ -657,8 +676,8 @@ describe('CacheService', () => {
 
     it('debe manejar multiples iteraciones de SCAN', async () => {
       mockRedisClient.scan
-        .mockResolvedValueOnce(['5', ['mchb:k:1']])
-        .mockResolvedValueOnce(['0', ['mchb:k:2']]);
+        .mockResolvedValueOnce(['5', ['taskhub:k:1']])
+        .mockResolvedValueOnce(['0', ['taskhub:k:2']]);
 
       const keys = await service.listKeys('k:*');
 
@@ -675,7 +694,7 @@ describe('CacheService', () => {
     });
 
     it('debe usar limite por defecto de 100', async () => {
-      const manyKeys = Array.from({ length: 100 }, (_, i) => `mchb:x:${i}`);
+      const manyKeys = Array.from({ length: 100 }, (_, i) => `taskhub:x:${i}`);
       mockRedisClient.scan.mockResolvedValue(['0', manyKeys]);
 
       const keys = await service.listKeys('x:*');
@@ -683,7 +702,7 @@ describe('CacheService', () => {
       expect(keys).toHaveLength(100);
     });
 
-    it('debe manejar claves sin prefijo mchb:', async () => {
+    it('debe manejar claves sin prefijo taskhub:', async () => {
       mockRedisClient.scan.mockResolvedValue(['0', ['raw:key']]);
 
       const keys = await service.listKeys('raw:*');

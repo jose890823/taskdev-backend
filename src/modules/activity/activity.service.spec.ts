@@ -429,9 +429,9 @@ describe('ActivityService', () => {
     });
 
     it('debe lanzar BadRequestException con fecha parcial', async () => {
-      await expect(
-        service.getDailySummary(userId, '2026-03'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.getDailySummary(userId, '2026-03')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('debe lanzar BadRequestException con texto no-fecha', async () => {

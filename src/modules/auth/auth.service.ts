@@ -10,10 +10,10 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomInt, randomBytes } from 'crypto';
+import { randomInt, randomBytes, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -64,6 +64,7 @@ export class AuthService {
     private userActivityService: UserActivityService,
     private loginAttemptService: LoginAttemptService,
     private activeSessionService: ActiveSessionService,
+    private dataSource: DataSource,
     @Optional() @Inject('EmailService') private emailService?: IEmailService,
   ) {
     if (this.emailService) {
@@ -96,12 +97,25 @@ export class AuthService {
         throw new ConflictException('El email ya está registrado');
       }
 
-      // Si el usuario está soft-deleted, eliminarlo permanentemente
-      // para permitir el nuevo registro con el mismo email
+      // Si el usuario está soft-deleted, anonymize the old record to free the email
+      // but preserve audit trail. Wrapped in a transaction for consistency.
       this.logger.log(
-        `🗑️ Removing soft-deleted user with email ${email} to allow new registration`,
+        `🔄 Anonymizing soft-deleted user with email ${email} to allow new registration`,
       );
-      await this.userRepository.remove(existingUser);
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      try {
+        await queryRunner.manager.update(User, existingUser.id, {
+          email: `deleted_${existingUser.id}@anonymized.local`,
+        });
+        await queryRunner.commitTransaction();
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     // Hash del password
@@ -217,8 +231,18 @@ export class AuthService {
       );
     }
 
-    // Verificar el código OTP
-    if (user.otpCode !== otpCode) {
+    // Verificar el código OTP (timing-safe comparison to prevent timing attacks)
+    const isOtpValid =
+      user.otpCode != null &&
+      otpCode != null &&
+      Buffer.byteLength(String(user.otpCode)) ===
+        Buffer.byteLength(String(otpCode)) &&
+      timingSafeEqual(
+        Buffer.from(String(user.otpCode)),
+        Buffer.from(String(otpCode)),
+      );
+
+    if (!isOtpValid) {
       // Incrementar intentos fallidos
       user.otpAttempts += 1;
       await this.userRepository.save(user);
@@ -474,7 +498,8 @@ export class AuthService {
 
   /**
    * REFRESH: Generar nuevos tokens (rotation)
-   * Integrado con sistema de sesiones activas
+   * Integrado con sistema de sesiones activas.
+   * Uses SELECT FOR UPDATE to prevent TOCTOU race on concurrent refresh requests.
    */
   async refresh(
     refreshToken: string,
@@ -482,62 +507,85 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Usuario no válido');
+    try {
+      // Acquire pessimistic write lock on user row to serialize concurrent refreshes
+      const user = await queryRunner.manager.findOne(User, {
+        where: { id: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('Usuario no válido');
+      }
+
+      // Verificar que el usuario tenga un refresh token
+      if (!user.refreshToken) {
+        throw new UnauthorizedException('Refresh token inválido');
+      }
+
+      // Verificar que el refresh token no haya expirado
+      if (
+        user.refreshTokenExpiresAt &&
+        new Date() > user.refreshTokenExpiresAt
+      ) {
+        throw new UnauthorizedException('Refresh token expirado');
+      }
+
+      // Verificar el refresh token
+      const isTokenValid = await bcrypt.compare(
+        refreshToken,
+        user.refreshToken,
+      );
+      if (!isTokenValid) {
+        throw new UnauthorizedException('Refresh token inválido');
+      }
+
+      // Actualizar actividad de la sesión
+      await this.activeSessionService.updateActivity(refreshToken);
+
+      // Revocar sesión anterior (el token está siendo rotado)
+      await this.activeSessionService.revokeSession(refreshToken);
+
+      // Generar nuevos tokens (rotation)
+      const newAccessToken = await this.generateAccessToken(user);
+      const newRefreshToken = await this.generateRefreshToken(user);
+
+      // Guardar nuevo refresh token within the same transaction
+      const hashedRefreshToken = await this.hashPassword(newRefreshToken);
+      const refreshTokenExpiresAt = this.getRefreshTokenExpirationDate();
+
+      user.refreshToken = hashedRefreshToken;
+      user.refreshTokenExpiresAt = refreshTokenExpiresAt;
+      await queryRunner.manager.save(user);
+
+      await queryRunner.commitTransaction();
+
+      // Crear nueva sesión con el nuevo refresh token (outside transaction — non-critical)
+      const ip = ipAddress || '0.0.0.0';
+      const ua = userAgent || null;
+      await this.activeSessionService.createSession(
+        user.id,
+        newRefreshToken,
+        ip,
+        ua,
+      );
+
+      this.logger.log(`🔄 Tokens renovados para usuario: ${user.email}`);
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Verificar que el usuario tenga un refresh token
-    if (!user.refreshToken) {
-      throw new UnauthorizedException('Refresh token inválido');
-    }
-
-    // Verificar que el refresh token no haya expirado
-    if (user.refreshTokenExpiresAt && new Date() > user.refreshTokenExpiresAt) {
-      throw new UnauthorizedException('Refresh token expirado');
-    }
-
-    // Verificar el refresh token
-    const isTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
-    if (!isTokenValid) {
-      throw new UnauthorizedException('Refresh token inválido');
-    }
-
-    // Actualizar actividad de la sesión
-    await this.activeSessionService.updateActivity(refreshToken);
-
-    // Revocar sesión anterior (el token está siendo rotado)
-    await this.activeSessionService.revokeSession(refreshToken);
-
-    // Generar nuevos tokens (rotation)
-    const newAccessToken = await this.generateAccessToken(user);
-    const newRefreshToken = await this.generateRefreshToken(user);
-
-    // Guardar nuevo refresh token
-    const hashedRefreshToken = await this.hashPassword(newRefreshToken);
-    const refreshTokenExpiresAt = this.getRefreshTokenExpirationDate();
-
-    user.refreshToken = hashedRefreshToken;
-    user.refreshTokenExpiresAt = refreshTokenExpiresAt;
-    await this.userRepository.save(user);
-
-    // Crear nueva sesión con el nuevo refresh token
-    const ip = ipAddress || '0.0.0.0';
-    const ua = userAgent || null;
-    await this.activeSessionService.createSession(
-      user.id,
-      newRefreshToken,
-      ip,
-      ua,
-    );
-
-    this.logger.log(`🔄 Tokens renovados para usuario: ${user.email}`);
-
-    return {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    };
   }
 
   /**
@@ -924,8 +972,18 @@ export class AuthService {
       );
     }
 
-    // Verificar código OTP
-    if (user.otpCode !== otpCode) {
+    // Verificar código OTP (timing-safe comparison to prevent timing attacks)
+    const isOtpValid =
+      user.otpCode != null &&
+      otpCode != null &&
+      Buffer.byteLength(String(user.otpCode)) ===
+        Buffer.byteLength(String(otpCode)) &&
+      timingSafeEqual(
+        Buffer.from(String(user.otpCode)),
+        Buffer.from(String(otpCode)),
+      );
+
+    if (!isOtpValid) {
       user.otpAttempts += 1;
       await this.userRepository.save(user);
 
@@ -1107,10 +1165,26 @@ export class AuthService {
    * Calcular fecha de expiración del refresh token
    */
   private getRefreshTokenExpirationDate(): Date {
-    const expirationDays = 7; // 7 días por defecto
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + expirationDays);
-    return expiresAt;
+    const refreshExpiration = this.configService.get<string>(
+      'JWT_REFRESH_EXPIRATION',
+      '7d',
+    );
+    const match = refreshExpiration.match(/^(\d+)([dhms])$/);
+    let ms: number;
+    if (match) {
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      const multipliers: Record<string, number> = {
+        d: 24 * 60 * 60 * 1000,
+        h: 60 * 60 * 1000,
+        m: 60 * 1000,
+        s: 1000,
+      };
+      ms = value * (multipliers[unit] || 24 * 60 * 60 * 1000);
+    } else {
+      ms = 7 * 24 * 60 * 60 * 1000; // Fallback: 7 days
+    }
+    return new Date(Date.now() + ms);
   }
 
   /**

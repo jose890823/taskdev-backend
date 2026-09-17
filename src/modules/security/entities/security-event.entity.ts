@@ -29,6 +29,15 @@ export enum SecurityEventType {
   SESSION_CREATED = 'session_created',
   SESSION_REVOKED = 'session_revoked',
   ADMIN_ACTION = 'admin_action',
+  API_KEY_CREATED = 'api_key_created',
+  API_KEY_REVEALED = 'api_key_revealed',
+  API_KEY_REVOKED = 'api_key_revoked',
+  API_KEY_REPLACED = 'api_key_replaced',
+  API_KEY_INVALID = 'api_key_invalid',
+  API_KEY_EXPIRED = 'api_key_expired',
+  API_KEY_SCOPE_DENIED = 'api_key_scope_denied',
+  API_KEY_PROJECT_DENIED = 'api_key_project_denied',
+  API_KEY_RATE_LIMITED = 'api_key_rate_limited',
 }
 
 export enum SecurityEventSeverity {

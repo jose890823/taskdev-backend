@@ -211,9 +211,7 @@ describe('FeatureFlagsService', () => {
     it('debe actualizar un feature flag correctamente', async () => {
       const updatedFlag = { ...mockFlag, ...updateDto };
       featureFlagRepository.findOne.mockResolvedValue({ ...mockFlag });
-      featureFlagRepository.save.mockResolvedValue(
-        updatedFlag as FeatureFlag,
-      );
+      featureFlagRepository.save.mockResolvedValue(updatedFlag as FeatureFlag);
 
       const result = await service.update(flagId, updateDto);
 
@@ -402,7 +400,7 @@ describe('FeatureFlagsService', () => {
       expect(result).toBe(true);
     });
 
-    it('debe ignorar restriccion de roles si no se proporcionan roles en el contexto', async () => {
+    it('debe denegar acceso cuando enabledForRoles esta configurado pero no se proporcionan roles en el contexto', async () => {
       const flagWithRoles = {
         ...mockFlag,
         enabledForRoles: ['admin'],
@@ -413,7 +411,7 @@ describe('FeatureFlagsService', () => {
 
       const result = await service.isEnabled('app.multi_vendor', {});
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it('debe retornar true si la tienda esta en enabledForStores', async () => {
@@ -545,9 +543,7 @@ describe('FeatureFlagsService', () => {
         enabledForRoles: ['admin'],
         enabledForStores: ['store-1'],
       };
-      featureFlagRepository.findOne.mockResolvedValue(
-        flagBoth as FeatureFlag,
-      );
+      featureFlagRepository.findOne.mockResolvedValue(flagBoth as FeatureFlag);
 
       // Both match
       const result = await service.isEnabled('app.multi_vendor', {
@@ -563,9 +559,7 @@ describe('FeatureFlagsService', () => {
         enabledForRoles: ['admin'],
         enabledForStores: ['store-1'],
       };
-      featureFlagRepository.findOne.mockResolvedValue(
-        flagBoth as FeatureFlag,
-      );
+      featureFlagRepository.findOne.mockResolvedValue(flagBoth as FeatureFlag);
 
       const result = await service.isEnabled('app.multi_vendor', {
         roles: ['admin'],

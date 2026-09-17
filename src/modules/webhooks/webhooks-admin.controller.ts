@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -189,13 +190,16 @@ export class WebhooksAdminController {
       },
     },
   })
-  async cleanOldEvents(@Query('daysToKeep') daysToKeep?: number) {
-    const days = daysToKeep ? Number(daysToKeep) : 90;
-    const deletedCount = await this.webhooksService.cleanOldEvents(days);
+  async cleanOldEvents(
+    @Query('daysToKeep', new ParseIntPipe({ optional: true }))
+    daysToKeep?: number,
+  ) {
+    const safeDays = Math.max(1, daysToKeep ?? 90);
+    const deletedCount = await this.webhooksService.cleanOldEvents(safeDays);
 
     return {
       message: `Limpieza de webhooks completada: ${deletedCount} eventos eliminados`,
-      data: { deletedCount, daysKept: days },
+      data: { deletedCount, daysKept: safeDays },
     };
   }
 }

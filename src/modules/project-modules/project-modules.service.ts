@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ProjectModule } from './entities/project-module.entity';
 import {
   CreateProjectModuleDto,
@@ -20,6 +20,7 @@ export class ProjectModulesService {
   constructor(
     @InjectRepository(ProjectModule)
     private readonly moduleRepository: Repository<ProjectModule>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(
@@ -89,6 +90,10 @@ export class ProjectModulesService {
     return mod;
   }
 
+  async findByIds(ids: string[]): Promise<ProjectModule[]> {
+    return this.moduleRepository.find({ where: { id: In(ids) } });
+  }
+
   async update(
     id: string,
     dto: UpdateProjectModuleDto,
@@ -106,8 +111,21 @@ export class ProjectModulesService {
   }
 
   async reorder(dto: ReorderModulesDto): Promise<void> {
-    for (let i = 0; i < dto.ids.length; i++) {
-      await this.moduleRepository.update(dto.ids[i], { position: i });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      for (let i = 0; i < dto.ids.length; i++) {
+        await queryRunner.manager.update(ProjectModule, dto.ids[i], {
+          position: i,
+        });
+      }
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
 

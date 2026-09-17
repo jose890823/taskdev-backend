@@ -5,7 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TasksService } from './tasks.service';
 import { Task, TaskType, TaskPriority } from './entities/task.entity';
@@ -132,14 +132,15 @@ describe('TasksService', () => {
     release: jest.fn(),
     manager: {
       update: jest.fn(),
-      save: jest.fn(),
+      save: jest
+        .fn()
+        .mockImplementation((_Entity, data) => Promise.resolve(data)),
+      delete: jest.fn(),
     },
   };
 
   // DataSource mock — needs getRepository for Comment / TaskCommentRead / User
   const mockCommentQb = createMockQueryBuilder([]);
-  const mockTaskCommentReadQb = createMockQueryBuilder([]);
-  const mockUserQb = createMockQueryBuilder([]);
 
   const mockDataSource = {
     createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
@@ -488,16 +489,15 @@ describe('TasksService', () => {
     it('debe actualizar una tarea exitosamente', async () => {
       const existing = mockTask();
       const dto: UpdateTaskDto = { title: 'Titulo actualizado' };
-      const savedTask = { ...existing, title: 'Titulo actualizado' };
 
       mockTaskRepository.findOne.mockResolvedValue(existing);
-      mockTaskRepository.save.mockResolvedValue(savedTask);
-      // getTaskAssignees
+      // getTaskAssignees (after save)
       mockTaskAssigneeRepository.find.mockResolvedValue([]);
 
       const result = await service.update('task-1', dto);
 
-      expect(mockTaskRepository.save).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.save).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(result).toHaveProperty('assignees');
       expect(result.assignees).toEqual([]);
     });
@@ -521,7 +521,6 @@ describe('TasksService', () => {
 
       mockTaskRepository.findOne.mockResolvedValue(existing);
       mockTaskStatusesService.findById.mockResolvedValue(completedStatus);
-      mockTaskRepository.save.mockImplementation(async (task) => task);
       mockTaskAssigneeRepository.find.mockResolvedValue([]);
 
       const result = await service.update('task-1', dto);
@@ -543,7 +542,6 @@ describe('TasksService', () => {
 
       mockTaskRepository.findOne.mockResolvedValue(existing);
       mockTaskStatusesService.findById.mockResolvedValue(inProgressStatus);
-      mockTaskRepository.save.mockImplementation(async (task) => task);
       mockTaskAssigneeRepository.find.mockResolvedValue([]);
 
       const result = await service.update('task-1', dto);
@@ -593,16 +591,13 @@ describe('TasksService', () => {
             },
           },
         ]);
-      mockTaskAssigneeRepository.delete.mockResolvedValue(undefined);
       mockTaskAssigneeRepository.create.mockImplementation((data) => data);
-      mockTaskAssigneeRepository.save.mockResolvedValue(undefined);
-      mockTaskRepository.save.mockImplementation(async (task) => task);
 
       const result = await service.update('task-1', dto);
 
-      expect(mockTaskAssigneeRepository.delete).toHaveBeenCalledWith({
-        taskId: 'task-1',
-      });
+      // CW-40: assignee operations now go through queryRunner transaction
+      expect(mockQueryRunner.manager.delete).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(result.assignees).toHaveLength(2);
     });
 
@@ -622,7 +617,6 @@ describe('TasksService', () => {
         .mockResolvedValueOnce(completedStatus) // first call in update for isCompleted check
         .mockResolvedValueOnce(oldStatus) // old status in event emission
         .mockResolvedValueOnce(completedStatus); // new status in event emission
-      mockTaskRepository.save.mockImplementation(async (task) => task);
       mockTaskAssigneeRepository.find.mockResolvedValue([]);
 
       await service.update('task-1', dto, currentUser);
