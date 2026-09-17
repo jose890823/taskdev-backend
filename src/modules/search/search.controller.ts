@@ -1,4 +1,11 @@
-import { Controller, Get, Query, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  ForbiddenException,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -10,9 +17,14 @@ import { ProjectsService } from '../projects/projects.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
+import type { ApiKeyRequest } from '../api-keys/api-key.types';
+import { assertApiKeyProject } from '../api-keys/api-key.policy';
 
 @ApiTags('Search')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller('search')
 export class SearchController {
   constructor(
@@ -22,6 +34,8 @@ export class SearchController {
   ) {}
 
   @Get()
+  @ApiKeyScopes('search:read')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Buscar entidad por systemCode' })
   @ApiQuery({
     name: 'code',
@@ -30,8 +44,35 @@ export class SearchController {
       'SystemCode de la entidad (ej: TSK-260218-A3K7, ORG-260218-B2C3, PRJ-260218-D4F1)',
     example: 'TSK-260218-A3K7',
   })
-  async findByCode(@Query('code') code: string, @CurrentUser() user: User) {
+  @ApiQuery({
+    name: 'projectId',
+    required: false,
+    description: 'Proyecto vinculado a la API key (obligatorio para API keys)',
+  })
+  async findByCode(
+    @Query('code') code: string,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
     const result = await this.searchService.findByCode(code);
+
+    if (request.identity?.authType === 'api-key') {
+      if (result.type === 'organization') {
+        const project = await this.projectsService.findById(
+          request.identity.projectId,
+        );
+        if (project.organizationId !== result.data.id) {
+          throw new ForbiddenException('Acceso al proyecto denegado');
+        }
+      } else {
+        assertApiKeyProject(
+          request,
+          result.type === 'project'
+            ? (result.data.id as string)
+            : (result.data.projectId as string | null),
+        );
+      }
+    }
 
     if (!user.isSuperAdmin()) {
       await this.verifyAccess(result.type, result.data, user.id);

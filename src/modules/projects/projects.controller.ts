@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,9 +19,12 @@ import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto, AddProjectMemberDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
@@ -66,6 +70,8 @@ export class ProjectsController {
   }
 
   @Get(':id/children')
+  @ApiKeyScopes('projects:read')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Listar sub-proyectos de un proyecto' })
   async findChildren(@Param('id') id: string, @CurrentUser() user: User) {
     const project = await this.projectsService.findById(id);
@@ -76,6 +82,8 @@ export class ProjectsController {
   }
 
   @Get(':id')
+  @ApiKeyScopes('projects:read')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Obtener proyecto por ID' })
   async findOne(@Param('id') id: string, @CurrentUser() user: User) {
     const project = await this.projectsService.findById(id);
@@ -86,6 +94,8 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @ApiKeyScopes('projects:write')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Actualizar proyecto' })
   async update(
     @Param('id') id: string,
@@ -98,11 +108,13 @@ export class ProjectsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar proyecto' })
   async remove(@Param('id') id: string, @CurrentUser() user: User) {
-    await this.projectsService.remove(id, user.id);
+    await this.projectsService.remove(id, user.id, user.isSuperAdmin());
     return { message: 'Proyecto eliminado' };
   }
 
   @Get(':id/members')
+  @ApiKeyScopes('project-members:read')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Listar miembros del proyecto' })
   async getMembers(@Param('id') id: string, @CurrentUser() user: User) {
     const project = await this.projectsService.findById(id);
@@ -113,6 +125,8 @@ export class ProjectsController {
   }
 
   @Post(':id/members')
+  @ApiKeyScopes('project-members:write')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Agregar miembro al proyecto' })
   async addMember(
     @Param('id') id: string,
@@ -123,6 +137,8 @@ export class ProjectsController {
   }
 
   @Delete(':id/members/:userId')
+  @ApiKeyScopes('project-members:write')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Eliminar miembro del proyecto' })
   async removeMember(
     @Param('id') id: string,

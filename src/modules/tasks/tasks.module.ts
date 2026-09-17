@@ -7,6 +7,8 @@ import { TasksController } from './tasks.controller';
 import { TaskStatusesModule } from '../task-statuses/task-statuses.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     TaskStatusesModule,
     ProjectsModule,
     OrganizationsModule,
+    ApiKeysModule,
+    AuthModule,
   ],
   controllers: [TasksController],
   providers: [TasksService],

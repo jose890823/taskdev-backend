@@ -7,7 +7,9 @@ import {
   Body,
   Param,
   Query,
+  Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,16 +22,28 @@ import { CreateTaskDto, UpdateTaskDto, BulkUpdatePositionsDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { TaskType } from './entities/task.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
+import type { ApiKeyRequest } from '../api-keys/api-key.types';
+import { assertApiKeyProject } from '../api-keys/api-key.policy';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Crear tarea' })
-  async create(@Body() dto: CreateTaskDto, @CurrentUser() user: User) {
+  async create(
+    @Body() dto: CreateTaskDto,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    assertApiKeyProject(request, dto.projectId);
     await this.tasksService.verifyTaskCreateAccess(
       dto.projectId || null,
       user.id,
@@ -46,6 +60,8 @@ export class TasksController {
   }
 
   @Get()
+  @ApiKeyScopes('tasks:read')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Listar tareas con filtros' })
   @ApiQuery({ name: 'projectId', required: false })
   @ApiQuery({
@@ -141,80 +157,145 @@ export class TasksController {
   }
 
   @Patch('bulk-positions')
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({
     summary: 'Actualizar posiciones y estados en bulk (drag & drop)',
   })
   async bulkUpdatePositions(
     @Body() dto: BulkUpdatePositionsDto,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ) {
     const taskIds = dto.items.map((item) => item.id);
     await this.tasksService.verifyBulkEditAccess(
       taskIds,
       user.id,
       user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
     );
     return this.tasksService.bulkUpdatePositions(dto.items);
   }
 
   @Get(':id')
+  @ApiKeyScopes('tasks:read')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Obtener tarea por ID con asignados' })
-  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    const task = await this.tasksService.verifyTaskAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
+    );
+    assertApiKeyProject(request, task.projectId);
     return this.tasksService.findByIdWithAssignees(id);
   }
 
   @Patch(':id')
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Actualizar tarea' })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ) {
-    await this.tasksService.verifyTaskEditAccess(
+    const task = await this.tasksService.verifyTaskEditAccess(
       id,
       user.id,
       user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
     );
+    assertApiKeyProject(request, task.projectId);
     return this.tasksService.update(id, dto, user);
   }
 
   @Delete(':id')
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Eliminar tarea' })
-  async remove(@Param('id') id: string, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskDeleteAccess(
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    const task = await this.tasksService.verifyTaskDeleteAccess(
       id,
       user.id,
       user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
     );
+    assertApiKeyProject(request, task.projectId);
     await this.tasksService.remove(id);
     return { message: 'Tarea eliminada' };
   }
 
   @Get(':id/subtasks')
+  @ApiKeyScopes('tasks:read')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Obtener subtareas' })
-  async getSubtasks(@Param('id') id: string, @CurrentUser() user: User) {
-    await this.tasksService.verifyTaskAccess(id, user.id, user.isSuperAdmin());
+  async getSubtasks(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    const task = await this.tasksService.verifyTaskAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
+    );
+    assertApiKeyProject(request, task.projectId);
     return this.tasksService.getSubtasks(id);
   }
 
   @Post(':id/subtasks')
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Crear subtarea' })
   async createSubtask(
     @Param('id') id: string,
     @Body() dto: CreateTaskDto,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ) {
     const parent = await this.tasksService.verifyTaskAccess(
       id,
       user.id,
       user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
     );
     await this.tasksService.verifyTaskCreateAccess(
       parent.projectId || null,
       user.id,
       user.isSuperAdmin(),
     );
+    assertApiKeyProject(request, parent.projectId);
+    assertApiKeyProject(request, dto.projectId || parent.projectId);
     return this.tasksService.createSubtask(id, dto, user);
   }
 }

@@ -8,17 +8,29 @@ import {
   Param,
   ParseUUIDPipe,
   ForbiddenException,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { TaskStatusesService } from './task-statuses.service';
 import { CreateTaskStatusDto, UpdateTaskStatusDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { ProjectRole } from '../projects/entities/project-member.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
+import type { ApiKeyRequest } from '../api-keys/api-key.types';
+import { assertApiKeyProject } from '../api-keys/api-key.policy';
 
 @ApiTags('Task Statuses')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller()
 export class TaskStatusesController {
   constructor(
@@ -27,8 +39,18 @@ export class TaskStatusesController {
   ) {}
 
   @Get('projects/:projectId/statuses')
+  @ApiKeyScopes('task-statuses:read')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Listar estados del proyecto' })
-  async findByProject(@Param('projectId', ParseUUIDPipe) projectId: string) {
+  async findByProject(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.projectsService.verifyMemberAccess(
+      projectId,
+      user.id,
+      user.isSuperAdmin(),
+    );
     return this.taskStatusesService.findByProject(projectId);
   }
 
@@ -39,6 +61,8 @@ export class TaskStatusesController {
   }
 
   @Post('projects/:projectId/statuses')
+  @ApiKeyScopes('task-statuses:write')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Crear estado para proyecto' })
   async create(
     @Param('projectId', ParseUUIDPipe) projectId: string,
@@ -50,13 +74,18 @@ export class TaskStatusesController {
   }
 
   @Patch('task-statuses/:id')
+  @ApiKeyScopes('task-statuses:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Actualizar estado' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTaskStatusDto,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ) {
     const status = await this.taskStatusesService.findById(id);
+    assertApiKeyProject(request, status.projectId);
     if (status.projectId) {
       await this.verifyProjectAdminAccess(status.projectId, user);
     } else if (!user.isSuperAdmin()) {
@@ -68,12 +97,17 @@ export class TaskStatusesController {
   }
 
   @Delete('task-statuses/:id')
+  @ApiKeyScopes('task-statuses:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({ summary: 'Eliminar estado' })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ) {
     const status = await this.taskStatusesService.findById(id);
+    assertApiKeyProject(request, status.projectId);
     if (status.projectId) {
       await this.verifyProjectAdminAccess(status.projectId, user);
     } else if (!user.isSuperAdmin()) {

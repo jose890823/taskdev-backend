@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -10,6 +11,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserRole } from './entities/user.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { API_KEY_METADATA_ONLY_KEY } from '../api-keys/decorators';
 
 /** Helper to create a mock Express Request with ip */
 
@@ -67,7 +70,10 @@ describe('AuthController', () => {
           useValue: mockAuthService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(CombinedAuthGuard)
+      .useValue({ canActivate: jest.fn() })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get(AuthService);
@@ -364,6 +370,17 @@ describe('AuthController', () => {
       expect(result).toHaveProperty('email');
       expect(result).not.toHaveProperty('password');
       expect(result).not.toHaveProperty('refreshToken');
+    });
+
+    it('debe aceptar autenticación combinada con metadata-only para API keys', () => {
+      const handler = AuthController.prototype.getMe;
+
+      expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toContain(
+        CombinedAuthGuard,
+      );
+      expect(Reflect.getMetadata(API_KEY_METADATA_ONLY_KEY, handler)).toBe(
+        true,
+      );
     });
   });
 });

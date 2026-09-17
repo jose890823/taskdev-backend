@@ -1,0 +1,67 @@
+schema: spec-driven
+project: taskdev-backend
+artifact_store: hybrid
+detected: '2026-09-14'
+strict_tdd: true
+
+context: |
+  This is the independent TaskHub backend repository.
+  Stack: NestJS 11, TypeScript 5.9, TypeORM, PostgreSQL, Redis/Bull, and Swagger.
+  Architecture: feature-based NestJS modules with shared infrastructure and JWT authentication.
+  Package manager: pnpm; repository-native commands run from this directory.
+  SDD artifacts are written in English and persisted to OpenSpec and Engram.
+  The mcp-api-key-auth planning artifacts remain at the workspace root and are not copied here.
+  Initialization does not explore or implement product features.
+
+projects:
+  - path: .
+    stack: NestJS 11, TypeScript, TypeORM, PostgreSQL, Redis/Bull
+    test_command: pnpm run test
+    test_layers:
+      unit: pnpm run test
+      integration: —
+      e2e: pnpm run test:e2e
+    coverage_command: pnpm run test:cov
+    linter_command: pnpm run lint
+    type_checker_command: pnpm run build
+    formatter_command: pnpm run format
+
+testing:
+  strict_tdd: true
+  workspace_test_command: pnpm run test
+  reason: The repository has one discovered project root, and its explicit root test command covers that complete in-scope project.
+  projects:
+    - path: .
+      framework: Jest 30 with ts-jest
+      unit_command: pnpm run test
+      integration_command: —
+      e2e_command: pnpm run test:e2e
+      coverage_command: pnpm run test:cov
+      quality:
+        linter: pnpm run lint
+        type_checker: pnpm run build
+        formatter: pnpm run format
+
+rules:
+  proposal:
+    - State scope, non-goals, risks, and rollback considerations.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords.
+  design:
+    - Document architecture decisions with rationale and identify backend contracts.
+  tasks:
+    - Group tasks by phase; keep each task completable in one session.
+  apply:
+    tdd: true
+    test_command: pnpm run test
+    guidelines:
+      - Work only in this backend repository and preserve unrelated working-tree changes.
+      - Follow backend/CLAUDE.md and the applicable skill registry entries.
+  verify:
+    test_command: pnpm run test
+    build_command: pnpm run build
+    coverage_threshold: 0
+    guidelines:
+      - Run commands from the backend repository root and report project-local results.
+  archive:
+    - Preserve the OpenSpec and Engram audit trail.

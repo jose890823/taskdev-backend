@@ -5,6 +5,7 @@ import {
   Query,
   ParseUUIDPipe,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,9 +17,12 @@ import { ActivityService } from './activity.service';
 import { ProjectsService } from '../projects/projects.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
 
 @ApiTags('Activity')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller('activity')
 export class ActivityController {
   constructor(
@@ -35,14 +39,17 @@ export class ActivityController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.activityService.findByUser(
-      user.id,
-      page ? +page : 1,
-      limit ? +limit : 20,
+    const safePage = Math.max(1, parseInt(page ?? '', 10) || 1);
+    const safeLimit = Math.min(
+      100,
+      Math.max(1, parseInt(limit ?? '', 10) || 20),
     );
+    return this.activityService.findByUser(user.id, safePage, safeLimit);
   }
 
   @Get('project/:projectId')
+  @ApiKeyScopes('activity:read')
+  @ApiKeyProjectParam('projectId')
   @ApiOperation({ summary: 'Actividad de un proyecto' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -58,11 +65,12 @@ export class ActivityController {
       user.isSuperAdmin(),
     );
 
-    return this.activityService.findByProject(
-      projectId,
-      page ? +page : 1,
-      limit ? +limit : 20,
+    const safePage = Math.max(1, parseInt(page ?? '', 10) || 1);
+    const safeLimit = Math.min(
+      100,
+      Math.max(1, parseInt(limit ?? '', 10) || 20),
     );
+    return this.activityService.findByProject(projectId, safePage, safeLimit);
   }
 
   @Get('daily-summary')

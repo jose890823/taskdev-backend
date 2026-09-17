@@ -9,6 +9,8 @@ import { InvitationsController } from './invitations.controller';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { User } from '../auth/entities/user.entity';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { AuthModule } from '../auth/auth.module';
 
 // Importacion condicional del EmailModule y EmailService
 
@@ -35,6 +37,8 @@ if (
     TypeOrmModule.forFeature([Invitation, User]),
     OrganizationsModule,
     ProjectsModule,
+    ApiKeysModule,
+    AuthModule,
     ConfigModule,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- spreading optional dynamic module
     ...(EmailModule ? [EmailModule] : []),

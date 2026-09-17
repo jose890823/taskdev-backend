@@ -1,9 +1,4 @@
-import {
-  Module,
-  Logger,
-  Global,
-  ClassSerializerInterceptor,
-} from '@nestjs/common';
+import { Module, Logger, ClassSerializerInterceptor } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -27,8 +22,10 @@ import { StorageModule } from './modules/storage/storage.module';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { CacheModule } from './modules/cache/cache.module';
-import { JobsModule } from './modules/jobs/jobs.module';
+// JobsModule deshabilitado: no hay jobs definidos, evita conexion Bull/Redis innecesaria
+// import { JobsModule } from './modules/jobs/jobs.module';
 import { I18nModule } from './modules/i18n/i18n.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 
 // Importar modulos de dominio TaskHub
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -57,7 +54,6 @@ if (
   }
 }
 
-@Global()
 @Module({
   imports: [
     DatabaseModule,
@@ -81,8 +77,9 @@ if (
     FeatureFlagsModule,
     WebhooksModule,
     CacheModule,
-    JobsModule,
+    // JobsModule — deshabilitado: scaffolding para uso futuro (sin jobs activos)
     I18nModule,
+    ApiKeysModule,
     // Dominio TaskHub
     OrganizationsModule,
     InvitationsModule,

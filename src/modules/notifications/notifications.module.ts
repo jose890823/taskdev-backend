@@ -33,6 +33,7 @@ import {
 
 // Auth Module (para guards)
 import { AuthModule } from '../auth/auth.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AuthModule } from '../auth/auth.module';
       }),
     }),
     forwardRef(() => AuthModule),
+    ApiKeysModule,
   ],
   controllers: [NotificationsController, NotificationsAdminController],
   providers: [

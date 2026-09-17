@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import * as express from 'express';
+import * as path from 'path';
 import helmet from 'helmet';
 
 async function bootstrap() {
@@ -45,7 +46,7 @@ async function bootstrap() {
   } as Parameters<typeof app.useBodyParser>[1]);
 
   // Configurar servicio de archivos estaticos para uploads
-  app.use('/uploads', express.static('uploads'));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Configurar prefijo global
   app.setGlobalPrefix('api');
@@ -95,10 +96,10 @@ async function bootstrap() {
         return callback(null, true);
       }
 
-      // En desarrollo, permitir cualquier localhost
+      // En desarrollo, permitir cualquier localhost (strict regex to avoid evil.localhost.com)
       if (
         process.env.NODE_ENV === 'development' &&
-        origin.includes('localhost')
+        /^https?:\/\/localhost(:\d+)?$/.test(origin)
       ) {
         return callback(null, true);
       }
@@ -127,6 +128,10 @@ async function bootstrap() {
       .setDescription('API de TaskHub - Gestion de Tareas y Proyectos')
       .setVersion('1.0')
       .addBearerAuth()
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'API key' },
+        'api-key',
+      )
       .addTag('Auth', 'Autenticacion y autorizacion')
       .addTag('Users', 'Gestion de usuarios')
       .addTag('Users - Profile', 'Perfil de usuario')

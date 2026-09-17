@@ -7,10 +7,12 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,19 +20,27 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from '../../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../../api-keys/decorators';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../auth/entities/user.entity';
+import type { ApiKeyRequest } from '../../api-keys/api-key.types';
 import { NotificationsService } from '../services/notifications.service';
 import { Notification } from '../entities/notification.entity';
 import { NotificationPreference } from '../entities/notification-preference.entity';
-import { NotificationQueryDto, UpdatePreferencesDto } from '../dto';
+import {
+  NotificationQueryDto,
+  UpdatePreferencesDto,
+  MarkManyAsReadDto,
+} from '../dto';
 
 @ApiTags('Notifications')
 @Controller('v1/notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(CombinedAuthGuard)
 @ApiBearerAuth()
+@ApiKeyProjectParam('projectId')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
@@ -39,6 +49,12 @@ export class NotificationsController {
   // ============================================
 
   @Get()
+  @ApiKeyScopes('notifications:read')
+  @ApiQuery({
+    name: 'projectId',
+    required: false,
+    description: 'Proyecto vinculado a la API key (obligatorio para API keys)',
+  })
   @ApiOperation({
     summary: 'Obtener mis notificaciones',
     description: 'Retorna las notificaciones del usuario autenticado',
@@ -50,6 +66,7 @@ export class NotificationsController {
   async findAll(
     @CurrentUser() user: User,
     @Query() query: NotificationQueryDto,
+    @Req() request: ApiKeyRequest,
   ): Promise<{
     data: Notification[];
     unreadCount: number;
@@ -60,10 +77,15 @@ export class NotificationsController {
       totalPages: number;
     };
   }> {
-    return this.notificationsService.findByUser(user.id, query);
+    return this.notificationsService.findByUser(user.id, {
+      ...query,
+      projectId: this.getProjectId(request, query.projectId),
+    });
   }
 
   @Get('unread-count')
+  @ApiKeyScopes('notifications:read')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({
     summary: 'Obtener conteo de no leídas',
     description: 'Retorna el número de notificaciones no leídas',
@@ -72,8 +94,14 @@ export class NotificationsController {
     status: 200,
     description: 'Conteo de notificaciones no leídas',
   })
-  async getUnreadCount(@CurrentUser() user: User): Promise<{ count: number }> {
-    const count = await this.notificationsService.getUnreadCount(user.id);
+  async getUnreadCount(
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ): Promise<{ count: number }> {
+    const count = await this.notificationsService.getUnreadCount(
+      user.id,
+      this.getProjectId(request),
+    );
     return { count };
   }
 
@@ -82,6 +110,8 @@ export class NotificationsController {
   // ============================================
 
   @Get(':id')
+  @ApiKeyScopes('notifications:read')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({
     summary: 'Obtener notificación',
     description: 'Retorna los detalles de una notificación',
@@ -95,8 +125,13 @@ export class NotificationsController {
   async findById(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ): Promise<Notification> {
-    return this.notificationsService.findById(id, user.id);
+    return this.notificationsService.findById(
+      id,
+      user.id,
+      this.getProjectId(request),
+    );
   }
 
   // ============================================
@@ -104,6 +139,8 @@ export class NotificationsController {
   // ============================================
 
   @Post(':id/read')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Marcar como leída',
@@ -118,11 +155,18 @@ export class NotificationsController {
   async markAsRead(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ): Promise<Notification> {
-    return this.notificationsService.markAsRead(id, user.id);
+    return this.notificationsService.markAsRead(
+      id,
+      user.id,
+      this.getProjectId(request),
+    );
   }
 
   @Post('read-all')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Marcar todas como leídas',
@@ -132,12 +176,20 @@ export class NotificationsController {
     status: 200,
     description: 'Notificaciones marcadas como leídas',
   })
-  async markAllAsRead(@CurrentUser() user: User): Promise<{ marked: number }> {
-    const marked = await this.notificationsService.markAllAsRead(user.id);
+  async markAllAsRead(
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ): Promise<{ marked: number }> {
+    const marked = await this.notificationsService.markAllAsRead(
+      user.id,
+      this.getProjectId(request),
+    );
     return { marked };
   }
 
   @Post('read-many')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Marcar varias como leídas',
@@ -149,11 +201,13 @@ export class NotificationsController {
   })
   async markManyAsRead(
     @CurrentUser() user: User,
-    @Body() body: { ids: string[] },
+    @Body() dto: MarkManyAsReadDto,
+    @Req() request: ApiKeyRequest,
   ): Promise<{ marked: number }> {
     const marked = await this.notificationsService.markManyAsRead(
-      body.ids,
+      dto.ids,
       user.id,
+      this.getProjectId(request),
     );
     return { marked };
   }
@@ -163,6 +217,8 @@ export class NotificationsController {
   // ============================================
 
   @Delete(':id')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar notificación',
@@ -173,11 +229,18 @@ export class NotificationsController {
   async delete(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ): Promise<void> {
-    await this.notificationsService.delete(id, user.id);
+    await this.notificationsService.delete(
+      id,
+      user.id,
+      this.getProjectId(request),
+    );
   }
 
   @Delete('read/all')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Eliminar todas las leídas',
@@ -187,8 +250,14 @@ export class NotificationsController {
     status: 200,
     description: 'Notificaciones eliminadas',
   })
-  async deleteAllRead(@CurrentUser() user: User): Promise<{ deleted: number }> {
-    const deleted = await this.notificationsService.deleteAllRead(user.id);
+  async deleteAllRead(
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ): Promise<{ deleted: number }> {
+    const deleted = await this.notificationsService.deleteAllRead(
+      user.id,
+      this.getProjectId(request),
+    );
     return { deleted };
   }
 
@@ -197,6 +266,8 @@ export class NotificationsController {
   // ============================================
 
   @Get('preferences/my')
+  @ApiKeyScopes('notifications:read')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({
     summary: 'Obtener mis preferencias',
     description: 'Retorna las preferencias de notificación del usuario',
@@ -208,11 +279,15 @@ export class NotificationsController {
   })
   async getPreferences(
     @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
   ): Promise<NotificationPreference> {
+    this.assertUserGlobalPreferencesAccess(request);
     return this.notificationsService.getOrCreatePreferences(user.id);
   }
 
   @Put('preferences/my')
+  @ApiKeyScopes('notifications:write')
+  @ApiQuery({ name: 'projectId', required: false })
   @ApiOperation({
     summary: 'Actualizar mis preferencias',
     description: 'Actualiza las preferencias de notificación del usuario',
@@ -225,7 +300,35 @@ export class NotificationsController {
   async updatePreferences(
     @CurrentUser() user: User,
     @Body() dto: UpdatePreferencesDto,
+    @Req() request: ApiKeyRequest,
   ): Promise<NotificationPreference> {
+    this.assertUserGlobalPreferencesAccess(request);
     return this.notificationsService.updatePreferences(user.id, dto);
+  }
+
+  private assertUserGlobalPreferencesAccess(request: ApiKeyRequest): void {
+    if (request.identity?.authType !== 'api-key') return;
+
+    throw new ForbiddenException({
+      code: 'PROJECT_ACCESS_DENIED',
+      message:
+        'Las preferencias globales del usuario no están disponibles para API keys vinculadas a proyectos',
+    });
+  }
+
+  private getProjectId(
+    request: ApiKeyRequest,
+    jwtProjectId?: string,
+  ): string | undefined {
+    if (request.identity?.authType !== 'api-key') return jwtProjectId;
+
+    const projectId = request.identity.projectId;
+    if (!projectId) {
+      throw new ForbiddenException({
+        code: 'PROJECT_ACCESS_DENIED',
+        message: 'Acceso al proyecto denegado',
+      });
+    }
+    return projectId;
   }
 }

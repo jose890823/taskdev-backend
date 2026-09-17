@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { UsersModule } from '../users/users.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
@@ -91,6 +92,7 @@ if (
 
     // UsersModule para el servicio de actividades
     UsersModule,
+    forwardRef(() => ApiKeysModule),
   ],
   controllers: [AuthController],
   providers: [

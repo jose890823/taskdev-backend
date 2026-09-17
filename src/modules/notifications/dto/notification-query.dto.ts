@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsBoolean,
   IsInt,
+  IsUUID,
   Min,
   Max,
 } from 'class-validator';
@@ -17,6 +18,13 @@ import {
  * DTO para filtrar notificaciones
  */
 export class NotificationQueryDto {
+  @ApiPropertyOptional({
+    description: 'Proyecto vinculado a la API key (obligatorio para API keys)',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  projectId?: string;
+
   @ApiPropertyOptional({
     example: 'task_assigned',
     description: 'Filtrar por tipo',

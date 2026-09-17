@@ -41,6 +41,8 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from './entities/user.entity';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyMetadataOnly } from '../api-keys/decorators';
 import {
   StandardResponseDto,
   ErrorResponseDto,
@@ -703,7 +705,8 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(CombinedAuthGuard)
+  @ApiKeyMetadataOnly()
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Obtener usuario autenticado',

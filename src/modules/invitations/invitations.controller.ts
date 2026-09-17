@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,9 +21,12 @@ import { CreateInvitationDto, CreateProjectInvitationDto } from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { Public } from '../auth/decorators/public.decorator';
+import { CombinedAuthGuard } from '../api-keys/guards';
+import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
 
 @ApiTags('Invitations')
 @ApiBearerAuth()
+@UseGuards(CombinedAuthGuard)
 @Controller()
 export class InvitationsController {
   constructor(
@@ -57,6 +61,8 @@ export class InvitationsController {
   }
 
   @Post('projects/:id/invitations')
+  @ApiKeyScopes('invitations:write')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Invitar usuario a proyecto por email' })
   @ApiResponse({
     status: 201,
@@ -75,6 +81,8 @@ export class InvitationsController {
   }
 
   @Get('projects/:id/invitations')
+  @ApiKeyScopes('invitations:read')
+  @ApiKeyProjectParam('id')
   @ApiOperation({ summary: 'Listar invitaciones pendientes de un proyecto' })
   async findByProject(
     @Param('id', ParseUUIDPipe) projectId: string,

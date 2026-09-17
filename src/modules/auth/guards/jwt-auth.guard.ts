@@ -6,6 +6,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import {
+  API_KEY_METADATA_ONLY_KEY,
+  API_KEY_SCOPES_KEY,
+} from '../../api-keys/decorators/api-key.decorator';
 
 /**
  * Guard para proteger rutas con JWT
@@ -20,16 +24,31 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
+    const request = context
+      .switchToHttp()
+      .getRequest<{ headers: Record<string, string | undefined> }>();
+    const authHeader = request.headers?.authorization || '';
+    const acceptsApiKey =
+      this.reflector.getAllAndOverride<string[]>(API_KEY_SCOPES_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) !== undefined ||
+      this.reflector.getAllAndOverride<boolean>(API_KEY_METADATA_ONLY_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true;
+
+    // Let the route-level CombinedAuthGuard validate annotated thk_ tokens.
+    if (acceptsApiKey && (!authHeader || /^Bearer\s+thk_/i.test(authHeader))) {
+      return true;
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
     if (isPublic) {
-      const request = context
-        .switchToHttp()
-        .getRequest<{ headers: Record<string, string | undefined> }>();
-      const authHeader = request.headers?.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         // Token present on public route — run Passport pipeline to attach user
         return super.canActivate(context) as Promise<boolean>;
