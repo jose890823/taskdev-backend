@@ -655,7 +655,8 @@ export class AuthController {
   }
 
   @Get('mcp-scopes')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(CombinedAuthGuard)
+  @ApiKeyMetadataOnly()
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Obtener scopes MCP del usuario',
