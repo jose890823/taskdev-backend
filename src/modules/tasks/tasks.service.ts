@@ -23,6 +23,7 @@ import {
 } from '../../common/utils/task-permissions.util';
 import { Comment } from '../comments/entities/comment.entity';
 import { TaskCommentRead } from '../comments/entities/task-comment-read.entity';
+import { TaskAiUsageService } from './task-ai-usage.service';
 
 export interface TaskAssigneeRef {
   id: string;
@@ -46,6 +47,7 @@ export class TasksService {
     private readonly taskRepository: Repository<Task>,
     @InjectRepository(TaskAssignee)
     private readonly taskAssigneeRepository: Repository<TaskAssignee>,
+    private readonly taskAiUsageService: TaskAiUsageService,
     private readonly taskStatusesService: TaskStatusesService,
     private readonly projectsService: ProjectsService,
     private readonly organizationsService: OrganizationsService,
@@ -316,6 +318,7 @@ export class TasksService {
       );
     }
 
+    const usageSummaries = await this.taskAiUsageService.getSummaries(taskIds);
     const data = tasks.map((task) => {
       const taskAssignees = assigneesByTask[task.id] || [];
       return {
@@ -330,6 +333,7 @@ export class TasksService {
         subtaskCount: subtaskCountMap[task.id] || 0,
         commentCount: commentCountMap[task.id] || 0,
         hasUnreadComments: !!unreadMap[task.id],
+        aiUsage: usageSummaries.get(task.id),
       };
     });
 
@@ -413,10 +417,12 @@ export class TasksService {
       }
     }
 
+    const usageSummaries = await this.taskAiUsageService.getSummaries(taskIds);
     return tasks.map((task) => ({
       ...task,
       assignees: assigneesByTask[task.id] || [],
       assignedTo: assigneesByTask[task.id]?.[0] || null,
+      aiUsage: usageSummaries.get(task.id),
     }));
   }
 
@@ -453,7 +459,11 @@ export class TasksService {
       }
     }
 
-    return { ...task, assignees };
+    return {
+      ...task,
+      assignees,
+      aiUsage: await this.taskAiUsageService.getSummary(task.id),
+    };
   }
 
   async update(

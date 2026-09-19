@@ -18,7 +18,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
-import { CreateTaskDto, UpdateTaskDto, BulkUpdatePositionsDto } from './dto';
+import {
+  CreateTaskDto,
+  UpdateTaskDto,
+  BulkUpdatePositionsDto,
+  RecordTaskAiUsageDto,
+} from './dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { TaskType } from './entities/task.entity';
@@ -26,13 +31,17 @@ import { CombinedAuthGuard } from '../api-keys/guards';
 import { ApiKeyProjectParam, ApiKeyScopes } from '../api-keys/decorators';
 import type { ApiKeyRequest } from '../api-keys/api-key.types';
 import { assertApiKeyProject } from '../api-keys/api-key.policy';
+import { TaskAiUsageService } from './task-ai-usage.service';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
 @UseGuards(CombinedAuthGuard)
 @Controller('tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly taskAiUsageService: TaskAiUsageService,
+  ) {}
 
   @Post()
   @ApiKeyScopes('tasks:write')
@@ -178,6 +187,51 @@ export class TasksController {
         : undefined,
     );
     return this.tasksService.bulkUpdatePositions(dto.items);
+  }
+
+  @Post(':id/ai-usage')
+  @ApiKeyScopes('tasks:write')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
+  @ApiOperation({ summary: 'Registrar uso de tokens de una ejecucion de IA' })
+  async recordAiUsage(
+    @Param('id') id: string,
+    @Body() dto: RecordTaskAiUsageDto,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    const task = await this.tasksService.verifyTaskAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
+    );
+    assertApiKeyProject(request, task.projectId);
+    return this.taskAiUsageService.record(task.id, dto);
+  }
+
+  @Get(':id/ai-usage')
+  @ApiKeyScopes('tasks:read')
+  @ApiKeyProjectParam('projectId')
+  @ApiQuery({ name: 'projectId', required: false })
+  @ApiOperation({ summary: 'Obtener uso de tokens y resumen de una tarea' })
+  async getAiUsage(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() request: ApiKeyRequest,
+  ) {
+    const task = await this.tasksService.verifyTaskAccess(
+      id,
+      user.id,
+      user.isSuperAdmin(),
+      request.identity?.authType === 'api-key'
+        ? request.identity.projectId
+        : undefined,
+    );
+    assertApiKeyProject(request, task.projectId);
+    return this.taskAiUsageService.getUsage(task.id);
   }
 
   @Get(':id')

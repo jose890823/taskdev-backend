@@ -7,9 +7,11 @@ import {
   DeleteDateColumn,
   Index,
   BeforeInsert,
+  OneToMany,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { generateSystemCode } from '../../../common/utils/system-code-generator.util';
+import { TaskAiUsageExecution } from './task-ai-usage-execution.entity';
 
 export enum TaskType {
   PROJECT = 'project',
@@ -104,6 +106,9 @@ export class Task {
 
   @DeleteDateColumn()
   deletedAt: Date | null;
+
+  @OneToMany(() => TaskAiUsageExecution, (execution) => execution.task)
+  aiUsageExecutions: TaskAiUsageExecution[];
 
   constructor(partial: Partial<Task>) {
     Object.assign(this, partial);

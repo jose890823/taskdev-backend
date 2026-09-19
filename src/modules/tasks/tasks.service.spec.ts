@@ -17,6 +17,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { User, UserRole } from '../auth/entities/user.entity';
 import { ProjectRole } from '../projects/entities/project-member.entity';
+import { TaskAiUsageService } from './task-ai-usage.service';
 
 // ── Helpers ──
 
@@ -153,6 +154,22 @@ describe('TasksService', () => {
     emit: jest.fn(),
   };
 
+  const mockTaskAiUsageService = {
+    getSummaries: jest.fn().mockResolvedValue(new Map()),
+    getSummary: jest.fn().mockResolvedValue({
+      status: 'not_registered',
+      executionCount: 0,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      confirmedInputTokens: null,
+      confirmedOutputTokens: null,
+      confirmedTotalTokens: null,
+      reasonCodes: ['no_usage_recorded'],
+      reasons: ['No AI usage has been registered for this task.'],
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -164,6 +181,10 @@ describe('TasksService', () => {
         {
           provide: getRepositoryToken(TaskAssignee),
           useValue: mockTaskAssigneeRepository,
+        },
+        {
+          provide: TaskAiUsageService,
+          useValue: mockTaskAiUsageService,
         },
         {
           provide: TaskStatusesService,
