@@ -42,7 +42,7 @@ export const API_KEY_SCOPES = [
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 export const DEFAULT_API_KEY_SCOPES: readonly ApiKeyScope[] = ['tasks:read'];
-export const MAX_API_KEY_SCOPES = 6;
+export const MAX_API_KEY_SCOPES = API_KEY_SCOPES.length;
 export const API_KEY_EXPIRATION_PRESETS = [30, 90, 180, 365] as const;
 
 export const API_KEY_LIMITS = {

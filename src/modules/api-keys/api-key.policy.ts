@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { ApiKeyRequest } from './api-key.types';
+import { API_KEY_SCOPES } from './api-key.constants';
 
 export function isProjectBindingAllowed(
   boundProjectId: string,
@@ -115,7 +116,7 @@ export function sanitizeApiKeyAuditMetadata(
       result[field] = Array.isArray(rawValue)
         ? rawValue
             .filter((item): item is string => typeof item === 'string')
-            .slice(0, 6)
+            .slice(0, API_KEY_SCOPES.length)
             .map((item) => item.slice(0, 64))
         : [];
       continue;

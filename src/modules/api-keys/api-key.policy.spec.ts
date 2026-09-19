@@ -1,4 +1,5 @@
 import { generateApiKey } from './api-key.crypto';
+import { API_KEY_SCOPES } from './api-key.constants';
 import {
   sanitizeApiKeyAuditMetadata,
   sanitizeApiKeyReason,
@@ -24,13 +25,19 @@ describe('API-key audit policy', () => {
       reason: 'retired https://example.test/path?token=secret',
       huge: 'not allowed',
       endpoint: '/api/tasks?projectId=secret',
-      requiredScopes: Array.from({ length: 10 }, () => 'tasks:read'),
+      requiredScopes: Array.from(
+        { length: API_KEY_SCOPES.length + 2 },
+        () => 'tasks:read',
+      ),
     });
 
     expect(metadata).toEqual({
       keyId: 'key-1',
       reason: 'retired [url]',
-      requiredScopes: Array.from({ length: 6 }, () => 'tasks:read'),
+      requiredScopes: Array.from(
+        { length: API_KEY_SCOPES.length },
+        () => 'tasks:read',
+      ),
     });
     expect(metadata.huge).toBeUndefined();
     expect(metadata.endpoint).toBeUndefined();

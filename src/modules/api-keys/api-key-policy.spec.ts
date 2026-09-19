@@ -15,7 +15,7 @@ describe('API-key policy', () => {
     expect(DEFAULT_API_KEY_SCOPES).toEqual(['tasks:read']);
     expect(API_KEY_SCOPES).toContain('project-members:write');
     expect(API_KEY_SCOPES).not.toContain('*');
-    expect(MAX_API_KEY_SCOPES).toBe(6);
+    expect(MAX_API_KEY_SCOPES).toBe(API_KEY_SCOPES.length);
     expect(API_KEY_LIMITS).toMatchObject({
       maxActivePerUser: 10,
       maxActivePerUserProject: 3,
