@@ -82,7 +82,7 @@ describe('StorageConfigService', () => {
         cloudName: 'my-cloud',
         apiKey: 'api-key-123',
         apiSecret: 'api-secret-456',
-        folder: 'michambita',
+        folder: 'taskhub',
       } as CloudinaryConfig,
     });
 

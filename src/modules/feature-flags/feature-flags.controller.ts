@@ -55,7 +55,7 @@ export class FeatureFlagsController {
   @ApiParam({
     name: 'key',
     description: 'Clave del feature flag',
-    example: 'michambita.content_generation',
+    example: 'taskhub.content_generation',
   })
   @ApiQuery({
     name: 'roles',
@@ -102,7 +102,7 @@ export class FeatureFlagsController {
   @ApiParam({
     name: 'key',
     description: 'Clave del feature flag',
-    example: 'michambita.content_generation',
+    example: 'taskhub.content_generation',
   })
   @ApiResponse({
     status: 200,

@@ -259,7 +259,7 @@ describe('SmsService', () => {
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: `Your MiChambita verification code is: ${OTP_CODE}. Valid for 10 minutes.`,
+          body: `Your TaskHub verification code is: ${OTP_CODE}. Valid for 10 minutes.`,
           to: PHONE_NUMBER,
         }),
       );

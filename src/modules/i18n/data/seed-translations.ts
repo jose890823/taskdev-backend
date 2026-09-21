@@ -473,14 +473,14 @@ export const SEED_TRANSLATIONS: SeedTranslation[] = [
   {
     key: 'common.welcome',
     locale: 'es',
-    value: 'Bienvenido a MiChambita',
+    value: 'Bienvenido a TaskHub',
     module: 'common',
     context: 'Mensaje de bienvenida general',
   },
   {
     key: 'common.welcome',
     locale: 'en',
-    value: 'Welcome to MiChambita',
+    value: 'Welcome to TaskHub',
     module: 'common',
     context: 'General welcome message',
   },
@@ -493,14 +493,14 @@ export const SEED_TRANSLATIONS: SeedTranslation[] = [
   {
     key: 'emails.welcome.subject',
     locale: 'es',
-    value: 'Bienvenido a MiChambita',
+    value: 'Bienvenido a TaskHub',
     module: 'emails',
     context: 'Asunto del email de bienvenida',
   },
   {
     key: 'emails.welcome.subject',
     locale: 'en',
-    value: 'Welcome to MiChambita',
+    value: 'Welcome to TaskHub',
     module: 'emails',
     context: 'Welcome email subject',
   },

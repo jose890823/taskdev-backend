@@ -134,7 +134,7 @@ export class CloudinaryConfigDto {
   apiSecret: string;
 
   @ApiPropertyOptional({
-    example: 'michambita',
+    example: 'taskhub',
     description: 'Carpeta base en Cloudinary',
   })
   @IsOptional()

@@ -77,11 +77,11 @@ export class AuthController {
           phone: '+17868391882',
         },
       },
-      ejemplo_michambita: {
-        summary: 'Example with MiChambita data',
+      ejemplo_taskhub: {
+        summary: 'Example with TaskHub data',
         description: 'Example with company contact phone',
         value: {
-          email: 'client@michambita.com',
+          email: 'client@taskhub.com',
           password: 'Client123!',
           firstName: 'Carlos',
           lastName: 'Rodriguez',

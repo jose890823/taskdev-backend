@@ -77,7 +77,7 @@ export class SmsService {
     phoneNumber: string,
     otpCode: string,
   ): Promise<boolean> {
-    const message = `Your MiChambita verification code is: ${otpCode}. Valid for 10 minutes.`;
+    const message = `Your TaskHub verification code is: ${otpCode}. Valid for 10 minutes.`;
     return this.sendSms(phoneNumber, message);
   }
 

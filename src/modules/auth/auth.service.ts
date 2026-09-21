@@ -720,7 +720,7 @@ export class AuthService {
     // Construir URL de reseteo
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') ||
-      'https://dev.michambita.com';
+      'https://dev.taskhub.com';
     const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 
     // Enviar email con link de reseteo

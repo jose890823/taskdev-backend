@@ -12,7 +12,7 @@ import {
 
 export class CreateFeatureFlagDto {
   @ApiProperty({
-    example: 'michambita.content_generation',
+    example: 'taskhub.content_generation',
     description:
       'Clave única del feature flag (formato: módulo.funcionalidad, solo letras minúsculas, números, puntos y guiones bajos)',
   })
@@ -89,7 +89,7 @@ export class CreateFeatureFlagDto {
   config?: Record<string, any>;
 
   @ApiProperty({
-    example: 'michambita.daily_ideas',
+    example: 'taskhub.daily_ideas',
     description: 'Clave de otro feature flag del cual depende',
     required: false,
   })

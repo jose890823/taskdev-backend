@@ -1,4 +1,4 @@
-# ROADMAP BACKEND - MiChambita
+# ROADMAP BACKEND - TaskHub
 
 ## Estado Actual: Infraestructura base lista
 Fecha: 2026-02-13

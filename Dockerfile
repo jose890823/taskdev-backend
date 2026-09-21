@@ -1,5 +1,5 @@
 # ============================================
-# DOCKERFILE - MiChambita Backend (NestJS)
+# DOCKERFILE - TaskHub Backend (NestJS)
 # Multi-stage build for production deployment
 # ============================================
 

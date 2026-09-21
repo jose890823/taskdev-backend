@@ -18,7 +18,7 @@ import { FEATURE_FLAG_KEY } from '../decorators/require-feature.decorator';
  *
  * Uso:
  * @UseGuards(JwtAuthGuard, FeatureFlagGuard)
- * @RequireFeature('michambita.content_generation')
+ * @RequireFeature('taskhub.content_generation')
  */
 @Injectable()
 export class FeatureFlagGuard implements CanActivate {

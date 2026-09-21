@@ -40,7 +40,7 @@ export class FeatureFlag {
   }
 
   @ApiProperty({
-    example: 'michambita.content_generation',
+    example: 'taskhub.content_generation',
     description: 'Clave única del feature flag (formato: módulo.funcionalidad)',
   })
   @Column({ type: 'varchar', length: 100 })
@@ -95,7 +95,7 @@ export class FeatureFlag {
   config: Record<string, any> | null;
 
   @ApiProperty({
-    example: 'michambita.daily_ideas',
+    example: 'taskhub.daily_ideas',
     description:
       'Clave de otro feature flag del cual depende (debe estar habilitado para que este funcione)',
     required: false,

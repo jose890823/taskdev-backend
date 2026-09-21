@@ -1,8 +1,8 @@
 {
-  "name": "michambita-backend",
+  "name": "taskhub-backend",
   "version": "1.0.0",
-  "description": "Backend API para MiChambita - Sistema de Inventario",
-  "author": "MiChambita",
+  "description": "Backend API para TaskHub - Sistema de gestion de tareas",
+  "author": "TaskHub",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

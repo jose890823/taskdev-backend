@@ -158,7 +158,7 @@ export class StorageConfigService implements OnModuleInit {
             apiKey: this.configService.get<string>('CLOUDINARY_API_KEY') || '',
             apiSecret:
               this.configService.get<string>('CLOUDINARY_API_SECRET') || '',
-            folder: 'michambita',
+            folder: 'taskhub',
           } as CloudinaryConfig,
           settings: defaultSettings,
         };

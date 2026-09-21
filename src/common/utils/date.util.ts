@@ -1,5 +1,5 @@
 /**
- * Utilidades de fechas para el backend MiChambita.
+ * Utilidades de fechas para el backend TaskHub.
  *
  * Politica estricta:
  * - Almacenamiento: Siempre UTC (timestamptz en PostgreSQL)

@@ -9,11 +9,11 @@ export const FEATURE_FLAG_KEY = 'feature_flag';
  * Decorator para requerir que un feature flag esté habilitado
  * para acceder a una ruta.
  *
- * Uso: @RequireFeature('michambita.content_generation')
+ * Uso: @RequireFeature('taskhub.content_generation')
  *
  * Debe usarse junto con FeatureFlagGuard:
  * @UseGuards(JwtAuthGuard, FeatureFlagGuard)
- * @RequireFeature('michambita.content_generation')
+ * @RequireFeature('taskhub.content_generation')
  */
 export const RequireFeature = (featureKey: string) =>
   SetMetadata(FEATURE_FLAG_KEY, featureKey);

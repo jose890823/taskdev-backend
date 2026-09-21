@@ -4,7 +4,7 @@ import { CacheAdminController } from './cache-admin.controller';
 import { CacheInterceptor } from './interceptors/cache.interceptor';
 
 /**
- * Modulo global de cache Redis para MiChambita.
+ * Modulo global de cache Redis para TaskHub.
  *
  * Al estar marcado como @Global(), CacheService esta disponible
  * en todos los modulos sin necesidad de importar CacheModule.

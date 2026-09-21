@@ -10,7 +10,7 @@ import { EmailService } from './email.service';
  *
  * Configuración requerida en .env:
  * - RESEND_API_KEY: Tu API key de Resend (obligatorio)
- * - EMAIL_FROM: Email remitente por defecto (opcional, default: noreply@michambita.com)
+ * - EMAIL_FROM: Email remitente por defecto (opcional, default: noreply@taskhub.com)
  *
  * Para obtener una API key gratuita:
  * 1. Registrarse en https://resend.com
