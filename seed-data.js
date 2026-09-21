@@ -13,13 +13,24 @@ const crypto = require('crypto');
 // ============================================
 // CONFIG
 // ============================================
+function getRequiredSeedEnv(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(
+      `Legacy seed script is not part of the current TaskHub seed flow. Set ${name} explicitly before running it.`,
+    );
+  }
+  return value;
+}
+
 const DB_CONFIG = {
-  host: 'localhost',
-  port: 5432,
-  database: 'michambita',
-  user: 'postgres',
-  password: 'postgres',
+  host: getRequiredSeedEnv('SEED_DB_HOST'),
+  port: Number(getRequiredSeedEnv('SEED_DB_PORT')),
+  database: getRequiredSeedEnv('SEED_DATABASE_NAME'),
+  user: getRequiredSeedEnv('SEED_DB_USER'),
+  password: getRequiredSeedEnv('SEED_DB_PASSWORD'),
 };
+const SEED_USER_PASSWORD = getRequiredSeedEnv('SEED_USER_PASSWORD');
 
 const SALT_ROUNDS = 10;
 
@@ -94,7 +105,7 @@ async function seed() {
 
     // Hash passwords
     console.log('Hashing passwords...');
-    const hashedPassword = await bcrypt.hash('Bohophy123!', SALT_ROUNDS);
+    const hashedPassword = await bcrypt.hash(SEED_USER_PASSWORD, SALT_ROUNDS);
 
     // ============================================
     // GENERATE ALL IDs UPFRONT
@@ -558,8 +569,8 @@ async function seed() {
     console.log(`  ID: ${ids.business}`);
     console.log('');
     console.log('Users created:');
-    console.log(`  Owner:    fernanda@bohophy.com / Bohophy123!`);
-    console.log(`  Employee: carlos@bohophy.com   / Bohophy123!`);
+    console.log(`  Owner:    fernanda@bohophy.com`);
+    console.log(`  Employee: carlos@bohophy.com`);
     console.log('');
     console.log('Data summary:');
     console.log(`  Categories:      ${categories.length}`);
