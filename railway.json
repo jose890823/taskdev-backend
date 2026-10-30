@@ -5,6 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
+    "preDeployCommand": "node node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
     "startCommand": "node dist/main",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100,
